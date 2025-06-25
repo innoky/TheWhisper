@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import User, Comment
+from .models import User, Comment, Post
 from rest_framework import status
 from . import serializers
 
@@ -17,7 +17,7 @@ def get_recent_users(request):
     """
     Возвращает последние 20 добавленных пользователей
     """
-    users = User.objects.all().order_by('-id')[:20]  # Сортируем по ID в обратном порядке
+    users = User.objects.all().order_by('-id')[:20] 
     serializer = serializers.UserSerializer(users, many=True)
     return Response(serializer.data)
 
@@ -47,7 +47,7 @@ def user_exists(request):
             "exists": True,
             "is_banned": user.is_banned,
             "is_admin": user.is_admin,
-            "balance": float(user.balance)  # Decimal -> float для JSON
+            "balance": float(user.balance)  
         }, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({"exists": False}, status=status.HTTP_200_OK)
@@ -116,6 +116,52 @@ def create_comment(request):
         }, status=status.HTTP_201_CREATED)
 
   
+    except User.DoesNotExist:
+        return Response(
+            {"error": "Author not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+def create_post(request):
+    """
+    Создает новый пост.
+    Обязательные поля: content
+    Необязательные: author_id, media_type, telegram_id
+    """
+    serializer = serializers.PostCreateSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            {"errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Обработка автора (может быть None)
+        author_id = serializer.validated_data.get('author_id')
+        author = User.objects.get(id=author_id) if author_id else None
+
+        post = Post.objects.create(
+            author=author,
+            content=serializer.validated_data['content'],
+            media_type=serializer.validated_data.get('media_type'),
+            telegram_id=serializer.validated_data.get('telegram_id')
+        )
+
+        return Response({
+            "id": post.id,
+            "author_id": post.author.id if post.author else None,
+            "content": post.content,
+            "created_at": post.created_at,
+            "status": "created"
+        }, status=status.HTTP_201_CREATED)
+
     except User.DoesNotExist:
         return Response(
             {"error": "Author not found"},

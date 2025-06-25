@@ -57,10 +57,10 @@ class Post(models.Model):
     content = models.TextField()
     media_type = models.CharField(max_length=32, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
     
     is_approved = models.BooleanField(default=False)
     is_rejected = models.BooleanField(default=False)
+    
     moderator_comment = models.TextField(blank=True, null=True)
     approved_at = models.DateTimeField(null=True, blank=True)
     

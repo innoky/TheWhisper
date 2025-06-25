@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Comment
+from .models import User, Comment, Post
 
 class UserIdSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(required=True, min_value=1)
@@ -33,3 +33,15 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'firstname', 'lastname', 'balance', 'is_admin', 'is_banned']
+
+class PostCreateSerializer(serializers.ModelSerializer):
+    author_id = serializers.IntegerField(required=False, allow_null=True)
+    
+    class Meta:
+        model = Post
+        fields = ['author_id', 'content', 'media_type', 'telegram_id']
+        extra_kwargs = {
+            'content': {'required': True},
+            'media_type': {'required': False},
+            'telegram_id': {'required': False}
+        }

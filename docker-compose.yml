@@ -28,6 +28,16 @@ services:
     networks:
       - app-network
 
+  bot:
+    build:
+      context: ./bot
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - db
+    networks:
+      - app-network
 
 volumes:
   pgdata:

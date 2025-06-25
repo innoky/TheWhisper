@@ -2,10 +2,15 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('ping/', views.ping),
-    path('user_exists/', views.user_exists),
-    path('create_user/', views.create_user, name='create_user'),
-    path('new_comment/', views.create_comment, name='create_anonymous_comment'),
-    path('recent_users/', views.get_recent_users, name='recent_users'),
+    path('ping/', views.ping, name = 'ping_api'),
+
+    
+    path('users/exists/', views.user_exists, name = 'existance_user_check'),
+    path('users/new/', views.create_user, name='user_create'),
+    path('users/recent/', views.get_recent_users, name='recent_users'),
+
+    path('comment/new/', views.create_comment, name='create_anonymous_comment'),
+
+    path('post/new/', views.create_post, name = 'post_create')
 ]
 
