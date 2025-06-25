@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.log
+*.pot
+*.mo
+*.env
+venv/
+env/
+.idea/
+.vscode/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+
+# Node / React
+frontend/node_modules/
+frontend/build/
+
+# MacOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Logs
+*.log
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Migrations (если хочешь их игнорировать, но обычно лучше хранить)
+# backend/api/migrations/
+
