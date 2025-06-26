@@ -151,14 +151,17 @@ def create_post(request):
             author=author,
             content=serializer.validated_data['content'],
             media_type=serializer.validated_data.get('media_type'),
-            telegram_id=serializer.validated_data.get('telegram_id')
+            telegram_id=serializer.validated_data.get('telegram_id'),
+            posted_at = serializer.validated_data.get('posted_at'),
+            is_approved = serializer.validated_data.get('is_approved')
         )
 
         return Response({
             "id": post.id,
             "author_id": post.author.id if post.author else None,
             "content": post.content,
-            "created_at": post.created_at,
+            "posted_at": post.posted_at,
+            "is_approved": post.is_approved,
             "status": "created"
         }, status=status.HTTP_201_CREATED)
 
@@ -172,3 +175,16 @@ def create_post(request):
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+def get_last_post(request):
+    """
+    Возвращает самый последний пост (сортировка по created_at)
+    """
+    last_post = Post.objects.first()  
+    
+    if not last_post:
+        return Response({"error": "No posts found"}, status=404)
+    
+    serializer = serializers.PostSerializer(last_post)
+    return Response(serializer.data)

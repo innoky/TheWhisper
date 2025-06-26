@@ -11,6 +11,7 @@ urlpatterns = [
 
     path('comment/new/', views.create_comment, name='create_anonymous_comment'),
 
-    path('post/new/', views.create_post, name = 'post_create')
+    path('post/new/', views.create_post, name = 'post_create'),
+    path('post/get_last', views.get_last_post, name = 'get_last_post')
 ]
 

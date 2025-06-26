@@ -44,6 +44,16 @@ INSTALLED_APPS = [
     'rest_framework',
     'api',
 ]
+USE_TZ = True
+TIME_ZONE = 'Europe/Moscow'
+
+REST_FRAMEWORK = {
+    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z",  # ISO-формат с временной зоной
+    'DATETIME_INPUT_FORMATS': [
+        "%Y-%m-%dT%H:%M:%S%z",  # С зоной
+        "%Y-%m-%dT%H:%M:%S",    # Без зоны (будет считать локальным)
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

@@ -7,7 +7,7 @@ from middlewares.logging import LoggingMiddleware
 # Импортируем хендлеры для регистрации
 
 from handlers.start import register_start_handlers
-
+from handlers.suggest import register_suggest_handler
 def register_handlers(dp: Dispatcher):
     # Регистрация всех хендлеров
     pass  # Хендлеры регистрируются через декораторы
@@ -30,8 +30,7 @@ def main():
     dp.update.middleware(LoggingMiddleware())
     # Импорт хендлеров уже регистрирует их через декораторы
     register_start_handlers(dp)
-   
-    
+    register_suggest_handler(dp)
     print("Bot started!")
     dp.run_polling(bot, skip_updates=True)
 

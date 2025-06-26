@@ -10,6 +10,8 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
+      TZ: Europe/Moscow  # Указываем временную зону
+      PGTZ: Europe/Moscow 
     ports:
       - "5432:5432"
     networks:
@@ -27,6 +29,9 @@ services:
       - "8000:8000"
     networks:
       - app-network
+    environment:
+      TZ: Europe/Moscow  # Указываем временную зону
+      PGTZ: Europe/Moscow 
 
   bot:
     build:

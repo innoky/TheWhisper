@@ -39,9 +39,16 @@ class PostCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Post
-        fields = ['author_id', 'content', 'media_type', 'telegram_id']
+        fields = ['author_id', 'content', 'posted_at', 'media_type', 'telegram_id', 'is_approved']
         extra_kwargs = {
             'content': {'required': True},
             'media_type': {'required': False},
-            'telegram_id': {'required': False}
+            'telegram_id': {'required': False},
+            'posted_at': {'required': True},
+            'is_approved': {'required': True}
         }
+
+class PostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = '__all__' 
