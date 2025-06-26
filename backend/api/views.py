@@ -143,7 +143,6 @@ def create_post(request):
         )
 
     try:
-        # Обработка автора (может быть None)
         author_id = serializer.validated_data.get('author_id')
         author = User.objects.get(id=author_id) if author_id else None
 
@@ -153,7 +152,8 @@ def create_post(request):
             media_type=serializer.validated_data.get('media_type'),
             telegram_id=serializer.validated_data.get('telegram_id'),
             posted_at = serializer.validated_data.get('posted_at'),
-            is_approved = serializer.validated_data.get('is_approved')
+            is_rejected = serializer.validated_data.get('is_rejected'),
+            is_posted = serializer.validated_data.get('is_posted')
         )
 
         return Response({
@@ -161,7 +161,6 @@ def create_post(request):
             "author_id": post.author.id if post.author else None,
             "content": post.content,
             "posted_at": post.posted_at,
-            "is_approved": post.is_approved,
             "status": "created"
         }, status=status.HTTP_201_CREATED)
 
@@ -188,3 +187,99 @@ def get_last_post(request):
     
     serializer = serializers.PostSerializer(last_post)
     return Response(serializer.data)
+
+@api_view(['GET'])
+def get_recent_posts(request):
+    """
+    Возвращает последние 50 добавленных в очередь постов
+    """
+    posts = Post.objects.all()[:20] 
+    serializer = serializers.PostSerializer(posts, many=True)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+def mark_post_as_posted(request):
+    # Получаем ID поста из тела запроса
+    post_id = request.data.get('post_id')
+    
+    if not post_id:
+        return Response(
+            {"error": "post_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Ищем пост в базе данных
+        post = Post.objects.get(id=post_id)
+        
+        # Если пост уже помечен как опубликованный
+        if post.is_posted:
+            return Response(
+                {"message": "Post is already marked as posted"},
+                status=status.HTTP_200_OK
+            )
+        
+        # Помечаем пост как опубликованный
+        post.is_posted = True
+        post.save()
+        
+        return Response(
+            {"message": f"Post {post_id} successfully marked as posted"},
+            status=status.HTTP_200_OK
+        )
+            
+    except Post.DoesNotExist:
+        return Response(
+            {"error": f"Post with id {post_id} not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["POST"])
+def mark_post_as_rejected(request):
+    # Получаем ID поста из тела запроса
+    post_id = request.data.get('post_id')
+    
+    if not post_id:
+        return Response(
+            {"error": "post_id is required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Ищем пост в базе данных
+        
+        post = Post.objects.get(telegram_id=post_id)
+        print(post)
+        # Если пост уже помечен как опубликованный
+        if post.is_rejected:
+            return Response(
+                {"message": "Post is already marked as rejected"},
+                status=status.HTTP_200_OK
+            )
+        
+        # Помечаем пост как опубликованный
+        post.is_rejected = True
+        post.save()
+        
+        return Response(
+            {"message": f"Post {post_id} successfully marked as rejected"},
+            status=status.HTTP_200_OK
+        )
+            
+    except Post.DoesNotExist:
+        return Response(
+            {"error": f"Post with id {post_id} not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

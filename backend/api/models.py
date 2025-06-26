@@ -57,10 +57,10 @@ class Post(models.Model):
     content = models.TextField()
     media_type = models.CharField(max_length=32, null=True, blank=True)
     posted_at = models.DateTimeField()
-
-    is_approved = models.BooleanField(default=False)
+    
     is_rejected = models.BooleanField(default=False)
-  
+    is_posted = models.BooleanField(default=False)
+
     telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
 
     class Meta:

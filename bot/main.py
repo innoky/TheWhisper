@@ -1,8 +1,10 @@
 import logging
 import os
+import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from middlewares.logging import LoggingMiddleware
+from SugQueue import post_checker
 
 # Импортируем хендлеры для регистрации
 
@@ -11,6 +13,20 @@ from handlers.suggest import register_suggest_handler
 def register_handlers(dp: Dispatcher):
     # Регистрация всех хендлеров
     pass  # Хендлеры регистрируются через декораторы
+
+
+async def queue_worker(bot: Bot):
+    """Фоновая задача для обработки очереди"""
+    await post_checker(bot)
+          
+
+
+async def on_startup(bot):
+    """Действия при запуске бота"""
+    logging.info("Starting queue worker...")
+    asyncio.create_task(queue_worker(bot))
+
+
 
 
 def main():
@@ -32,6 +48,7 @@ def main():
     register_start_handlers(dp)
     register_suggest_handler(dp)
     print("Bot started!")
+    # dp.startup.register(on_startup)
     dp.run_polling(bot, skip_updates=True)
 
 if __name__ == '__main__':

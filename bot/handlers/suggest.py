@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import os
 import pytz
 from datetime import time
-from db.wapi import get_last_post, try_create_post
+from db.wapi import get_last_post, try_create_post, mark_post_as_posted, mark_post_as_rejected
 
 
 ACTIVE_START_HOUR = 10  # 10:00
@@ -44,6 +44,13 @@ def register_suggest_handler(dp: Dispatcher):
                 parse_mode=ParseMode.HTML
             )
 
+    @dp.callback_query(F.data.startswith(("reject_",)))
+    async def reject_callback(callback: types.CallbackQuery):
+       
+        result = await mark_post_as_rejected(callback.message.reply_to_message.message_id)
+
+        print("RESUUUUUULTTTT",result)
+        await callback.message.delete_reply_markup()
     @dp.callback_query(F.data.startswith(("approve_",)))
     async def approve_callback(callback: types.CallbackQuery):
         user_id = int(callback.data.split("_")[1])
