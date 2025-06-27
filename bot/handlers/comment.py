@@ -179,6 +179,7 @@ def register_comment_handlers(dp: Dispatcher):
         pseudo_names = await get_user_pseudo_names(callback.from_user.id)
         pseudo_name = next((pn for pn in pseudo_names if pn[0] == pseudo_name_id), None)
         media_type = data.get("media_type")
+        
         if media_type == "text":
             comment_text = data.get("comment_text")
             text = f"<b>{pseudo_name[1]} оставил(а) комментарий:</b>\n\n{comment_text}"
@@ -210,12 +211,9 @@ def register_comment_handlers(dp: Dispatcher):
                     ]
                 )
 
-
-                timestamp = int(callback.message.date.timestamp())
-
                 # Сохранение комментария в базу данных
-                
-                await leave_anon_comment(telegram_id=msg.message_id, post_id=target_message_id,user_id=msg.from_user.id, content=msg.text)
+               
+                await leave_anon_comment(telegram_id=msg.message_id, post_id=target_message_id, user_id=callback.from_user.id, content=comment_text)
 
 
                 await callback.bot.send_message(

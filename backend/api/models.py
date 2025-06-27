@@ -51,9 +51,9 @@ class LoginToken(models.Model):
 
 class Post(models.Model):
    
-    id = models.AutoField(primary_key=True)
+    post_id = models.AutoField(primary_key=True)
 
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    author_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     content = models.TextField()
     media_type = models.CharField(max_length=32, null=True, blank=True)
     posted_at = models.DateTimeField()
@@ -69,8 +69,8 @@ class Post(models.Model):
 
 class Comment(models.Model):
     id = models.AutoField(primary_key=True)
-    post = models.IntegerField()
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    to_post = models.IntegerField()
+    author_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -85,19 +85,19 @@ class Comment(models.Model):
 class PseudoNames(models.Model):
     id = models.AutoField(primary_key=True)
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    name = models.CharField(max_length=100, unique=True)
+    pseudo = models.CharField(max_length=100, unique=True)
     is_available = models.BooleanField(default=True)
 
     class Meta:
         db_table = "pseudo_names"
-        ordering = ['name']
+        ordering = ['pseudo']
         verbose_name = "Pseudo Name"
         verbose_name_plural = "Pseudo Names"
 
 class UserPseudoName(models.Model):
     id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    pseudo_name = models.ForeignKey(PseudoNames, on_delete=models.CASCADE)
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    nick_name = models.ForeignKey(PseudoNames, on_delete=models.CASCADE)
     purchase_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:

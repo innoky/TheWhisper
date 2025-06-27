@@ -10,6 +10,7 @@ urlpatterns = [
     path('users/recent/', views.get_recent_users, name='recent_users'),
     path('users/assign_pseudo/',views.assign_pseudo_name, name="assign_pseudo"),
     path('users/<int:user_id>/pseudo-names/', views.get_user_pseudo_names, name='user_pseudo_names'),
+    path('users/<int:user_id>/ban/', views.ban_user, name="ban/unban user" ),
 
     path('pseudo/new/', views.create_pseudo_name, name = 'create new pseudo'),
     path('pseudo/deactivate/', views.deactivate_pseudo_name, name = 'deactivate pseudo name'),

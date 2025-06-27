@@ -160,7 +160,7 @@ async def leave_anon_comment(telegram_id, post_id, user_id, content):
     headers = {'Content-Type': 'application/json'}
     
     # Преобразуем datetime в строку, если это необходимо
-    print(post_id,user_id, content, telegram_id)
+   
     payload = {
         "post": post_id,
         "author_id": user_id,
@@ -169,11 +169,13 @@ async def leave_anon_comment(telegram_id, post_id, user_id, content):
     }
     
     API_URL = 'http://backend:8000/api/comment/new/'
-
+    print("HEREEE")
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(API_URL, json=payload, headers=headers) as response:
-                return await response.json()  # Возвращаем ответ сервера
+                result = await response.json()  # Возвращаем ответ сервера
+                print(result)
+                return result
     except Exception as e:
         logging.exception("Error in try_create_post")
         return {"error": f"Request failed: {str(e)}"}
@@ -205,6 +207,7 @@ async def get_user_pseudo_names(user_id):
     except Exception as e:
         logging.exception("Error in get_last_post")
         return {"error": f"Request failed: {str(e)}"}
+
 async def is_user_banned(user_id):
     headers = {'Accept': 'application/json'}
     API_URL = 'http://backend:8000/api/users/exists/'  # URL вашего API
@@ -230,3 +233,47 @@ async def is_user_banned(user_id):
     except Exception as e:
         logging.exception("Error in get_last_post")
         return {"error": f"Request failed: {str(e)}"}
+    
+async def ban_user(user_id):
+    headers = {'Accept': 'application/json'}
+    API_URL = f'http://backend:8000/api/users/{user_id}/ban/'  # URL вашего API
+
+    if (await is_user_banned(user_id)):
+        return "User already banned"
+    else:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(API_URL,headers=headers) as response:
+                    if response.status == 200:
+                        print (await response.json() )
+                        return
+                    else:
+                        return {
+                            "error": f"API request failed with status {response.status}",
+                            "details": await response.text()
+                        }
+        except Exception as e:
+            logging.exception("Error in get_last_post")
+            return {"error": f"Request failed: {str(e)}"}
+ 
+async def unban_user(user_id):
+    headers = {'Accept': 'application/json'}
+    API_URL = f'http://backend:8000/api/users/{user_id}/ban/'  # URL вашего API
+
+    if not(await is_user_banned(user_id)):
+        return "User already гтbanned"
+    else:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(API_URL,headers=headers) as response:
+                    if response.status == 200:
+                        print (await response.json() )
+                        return
+                    else:
+                        return {
+                            "error": f"API request failed with status {response.status}",
+                            "details": await response.text()
+                        }
+        except Exception as e:
+            logging.exception("Error in get_last_post")
+            return {"error": f"Request failed: {str(e)}"}

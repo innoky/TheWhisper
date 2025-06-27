@@ -11,6 +11,7 @@ from SugQueue import post_checker
 from handlers.start import register_start_handlers
 from handlers.suggest import register_suggest_handler
 from handlers.comment import register_comment_handlers
+from handlers.admin import register_admin_handlers
 def register_handlers(dp: Dispatcher):
     # Регистрация всех хендлеров
     pass  # Хендлеры регистрируются через декораторы
@@ -48,7 +49,7 @@ def main():
     # Импорт хендлеров уже регистрирует их через декораторы
     register_comment_handlers(dp)
     register_start_handlers(dp)
-
+    register_admin_handlers(dp)
     register_suggest_handler(dp)
     print("Bot started!")
     dp.startup.register(on_startup)

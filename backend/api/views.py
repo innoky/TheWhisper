@@ -528,3 +528,48 @@ def get_user_pseudo_names(request, user_id):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['POST'])
+def ban_user(request, user_id):
+    """
+    Блокировка/разблокировка пользователя
+    URL параметр: user_id - ID пользователя
+    Возвращает:
+    - Новый статус is_banned
+    - Сообщение о результате
+    """
+    try:
+        # Получаем пользователя
+        user = User.objects.get(id=user_id)
+        
+        # Меняем статус
+        user.is_banned = not user.is_banned
+        user.save()
+        
+        action = "заблокирован" if user.is_banned else "разблокирован"
+        
+        return Response({
+            "status": "success",
+            "user_id": user.id,
+            "username": user.username,
+            "is_banned": user.is_banned,
+            "message": f"Пользователь {action}"
+        }, status=status.HTTP_200_OK)
+
+    except User.DoesNotExist:
+        return Response(
+            {
+                "status": "error",
+                "error": "Пользователь не найден",
+                "user_id": user_id
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {
+                "status": "error",
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
