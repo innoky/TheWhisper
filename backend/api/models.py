@@ -1,4 +1,3 @@
-
 from django.db import models
 
 
@@ -50,10 +49,8 @@ class LoginToken(models.Model):
 
 
 class Post(models.Model):
-   
-    post_id = models.AutoField(primary_key=True)
-
-    author_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    id = models.AutoField(primary_key=True)
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='posts')
     content = models.TextField()
     media_type = models.CharField(max_length=32, null=True, blank=True)
     posted_at = models.DateTimeField()
@@ -69,8 +66,8 @@ class Post(models.Model):
 
 class Comment(models.Model):
     id = models.AutoField(primary_key=True)
-    to_post = models.IntegerField()
-    author_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    reply_to = models.BigIntegerField(null=True, blank=True, help_text='ID тг-поста или комментария, на который идет ответ')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='comments')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -96,8 +93,8 @@ class PseudoNames(models.Model):
 
 class UserPseudoName(models.Model):
     id = models.AutoField(primary_key=True)
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
-    nick_name = models.ForeignKey(PseudoNames, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pseudo_names')
+    pseudo_name = models.ForeignKey(PseudoNames, on_delete=models.CASCADE, related_name='user_pseudo_names')
     purchase_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:

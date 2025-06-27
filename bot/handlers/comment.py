@@ -8,6 +8,7 @@ from aiogram.filters import CommandStart
 import logging
 from db.wapi import leave_anon_comment, get_user_pseudo_names, is_user_banned
 import os
+from keyboards.reply import build_market_keyboard
 
 NICKS_PER_PAGE = 5
 CHAT_ID = os.getenv("CHAT_ID")
@@ -20,23 +21,6 @@ class CommentState(StatesGroup):
     waiting_for_nick = State()
 
 
-
-def build_nick_keyboard(pseudo_names, page=0):
-    start = page * NICKS_PER_PAGE
-    end = start + NICKS_PER_PAGE
-    page_nicks = pseudo_names[start:end]
-    kb = [
-        [InlineKeyboardButton(text=pn[1], callback_data=f"choose_nick_{pn[0]}")]
-        for pn in page_nicks
-    ]
-    nav = []
-    if start > 0:
-        nav.append(InlineKeyboardButton(text="<<", callback_data=f"nickpage_{page-1}"))
-    if end < len(pseudo_names):
-        nav.append(InlineKeyboardButton(text=">>", callback_data=f"nickpage_{page+1}"))
-    if nav:
-        kb.append(nav)
-    return InlineKeyboardMarkup(inline_keyboard=kb)
 
 def register_comment_handlers(dp: Dispatcher):
     @dp.message(F.text.lower() == "отмена", CommentState.waiting_for_comment)
@@ -51,7 +35,7 @@ def register_comment_handlers(dp: Dispatcher):
     async def handle_photo(message: types.Message, state: FSMContext):
         pseudo_names = await get_user_pseudo_names(message.from_user.id)
         if not pseudo_names:
-            await message.answer("⚠️ <b>У вас нет купленных ников.</b>\nКупите ник в /market.", parse_mode=ParseMode.HTML)
+            await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
         await state.update_data(
@@ -60,7 +44,7 @@ def register_comment_handlers(dp: Dispatcher):
             caption=message.caption or "",
             nick_page=0
         )
-        kb = build_nick_keyboard(pseudo_names, page=0)
+        kb = build_market_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
             f"🖼️ <b>Ваша фотография с подписью:</b>\n\n<blockquote>{message.caption or ''}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
@@ -142,7 +126,7 @@ def register_comment_handlers(dp: Dispatcher):
             return
         pseudo_names = await get_user_pseudo_names(message.from_user.id)
         if not pseudo_names:
-            await message.answer("⚠️ <b>У вас нет купленных ников.</b>\nКупите ник в /market.", parse_mode=ParseMode.HTML)
+            await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
         await state.update_data(
@@ -150,7 +134,7 @@ def register_comment_handlers(dp: Dispatcher):
             comment_text=message.text,
             nick_page=0
         )
-        kb = build_nick_keyboard(pseudo_names, page=0)
+        kb = build_market_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
             f"💬 <b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
@@ -166,7 +150,7 @@ def register_comment_handlers(dp: Dispatcher):
         except Exception:
             page = 0
         pseudo_names = await get_user_pseudo_names(callback.from_user.id)
-        kb = build_nick_keyboard(pseudo_names, page=page)
+        kb = build_market_keyboard(pseudo_names, page=page)
         await state.update_data(nick_page=page)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
@@ -204,24 +188,8 @@ def register_comment_handlers(dp: Dispatcher):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
-                # Отправка в админ-чат с кнопкой Забанить
-                ban_keyboard = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{callback.from_user.id}")]
-                    ]
-                )
-
-                # Сохранение комментария в базу данных
-               
-                await leave_anon_comment(telegram_id=msg.message_id, post_id=target_message_id, user_id=callback.from_user.id, content=comment_text)
-
-
-                await callback.bot.send_message(
-                    chat_id=ADMIN_CHAT_ID,
-                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{CHAT_ID}/{target_message_id}\n\n{comment_text}",
-                    reply_markup=ban_keyboard,
-                    parse_mode=ParseMode.HTML
-                )
+                # Сохраняем комментарий через новый API
+                await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=comment_text)
             except Exception as e:
                 logging.exception("❌ Ошибка при отправке комментария:")
                 await callback.message.answer("❌ <b>Не удалось опубликовать комментарий. Возможно, пост удалён.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
