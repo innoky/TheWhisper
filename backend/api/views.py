@@ -1,8 +1,9 @@
 from django.shortcuts import render
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import User, Comment, Post
+from .models import User, Comment, Post, PseudoNames, UserPseudoName
 from rest_framework import status
+from django.core.paginator import Paginator
 from . import serializers
 
 @api_view(['GET'])
@@ -197,7 +198,6 @@ def get_recent_posts(request):
     serializer = serializers.PostSerializer(posts, many=True)
     return Response(serializer.data)
 
-
 @api_view(["POST"])
 def mark_post_as_posted(request):
     # Получаем ID поста из тела запроса
@@ -240,7 +240,6 @@ def mark_post_as_posted(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-
 @api_view(["POST"])
 def mark_post_as_rejected(request):
     # Получаем ID поста из тела запроса
@@ -281,5 +280,251 @@ def mark_post_as_rejected(request):
     except Exception as e:
         return Response(
             {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+def assign_pseudo_name(request):
+    """
+    Assigns a pseudo name to a user.
+    Required fields: user_id, pseudo_name_id
+    """
+    serializer = serializers.UserPseudoNameSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            {"errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user_id = serializer.validated_data['user_id']
+        pseudo_name_id = serializer.validated_data['pseudo_name_id']
+
+        # Check if user exists
+        user = User.objects.get(id=user_id)
+        
+        # Check if pseudo name exists
+        pseudo_name = PseudoNames.objects.get(id=pseudo_name_id)
+
+        # Create the relationship
+        user_pseudo = UserPseudoName.objects.create(
+            user=user,
+            pseudo_name=pseudo_name
+        )
+
+        return Response({
+            "id": user_pseudo.id,
+            "user_id": user_pseudo.user.id,
+            "pseudo_name_id": user_pseudo.pseudo_name.id,
+            "purchase_date": user_pseudo.purchase_date,
+            "status": "created"
+        }, status=status.HTTP_201_CREATED)
+
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except PseudoNames.DoesNotExist:
+        return Response(
+            {"error": "Pseudo name not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+@api_view(['POST'])
+def create_pseudo_name(request):
+    """
+    Creates a new pseudo name.
+    Required fields: name
+    Optional fields: price, is_available
+    """
+    serializer = serializers.PseudoNameCreateSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            {"errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        pseudo_name = PseudoNames.objects.create(
+            name=serializer.validated_data['name'],
+            price=serializer.validated_data.get('price', 0),
+            is_available=serializer.validated_data.get('is_available', True)
+        )
+
+        return Response({
+            "id": pseudo_name.id,
+            "name": pseudo_name.name,
+            "price": str(pseudo_name.price),
+            "is_available": pseudo_name.is_available,
+            "status": "created"
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['POST'])
+def deactivate_pseudo_name(request):
+    """
+    Деактивирует псевдоним, устанавливая is_available=False
+    Обязательное поле в теле запроса: pseudo_name_id
+    """
+    serializer = serializers.DeactivatePseudoNameSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            {"errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        pseudo_name_id = serializer.validated_data['pseudo_name_id']
+        pseudo_name = PseudoNames.objects.get(id=pseudo_name_id)
+        
+        if not pseudo_name.is_available:
+            return Response(
+                {
+                    "status": "already_deactivated",
+                    "message": "Псевдоним уже деактивирован",
+                    "pseudo_name_id": pseudo_name.id,
+                    "name": pseudo_name.name
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        pseudo_name.is_available = False
+        pseudo_name.save()
+        
+        return Response({
+            "status": "success",
+            "message": "Псевдоним успешно деактивирован",
+            "pseudo_name_id": pseudo_name.id,
+            "name": pseudo_name.name,
+            "is_available": pseudo_name.is_available
+        }, status=status.HTTP_200_OK)
+
+    except PseudoNames.DoesNotExist:
+        return Response(
+            {
+                "status": "error",
+                "error": "Псевдоним не найден",
+                "requested_id": pseudo_name_id
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {
+                "status": "error",
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+@api_view(['GET'])
+def list_pseudo_names(request):
+    """
+    Возвращает список всех псевдонимов с пагинацией
+    Параметры запроса:
+    - is_available (bool): фильтр по статусу доступности
+    - page (int): номер страницы (по умолчанию 1)
+    - page_size (int): элементов на странице (по умолчанию 20)
+    """
+    try:
+        # Получаем параметры фильтрации
+        is_available = request.GET.get('is_available')
+        if is_available is not None:
+            is_available = is_available.lower() == 'true'
+
+        # Фильтрация
+        queryset = PseudoNames.objects.all()
+        if is_available is not None:
+            queryset = queryset.filter(is_available=is_available)
+
+        # Пагинация
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        paginator = Paginator(queryset.order_by('name'), page_size)
+        page_obj = paginator.get_page(page)
+
+        # Сериализация
+        serializer = serializers.PseudoNameSerializer(page_obj, many=True)
+        
+        return Response({
+            "status": "success",
+            "count": paginator.count,
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+            "results": serializer.data
+        })
+
+    except Exception as e:
+        return Response(
+            {
+                "status": "error",
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_user_pseudo_names(request, user_id):
+    """
+    Возвращает все псевдонимы принадлежащие указанному пользователю
+    URL параметр: user_id - ID пользователя
+    GET параметры:
+    - page (int): номер страницы
+    - page_size (int): элементов на странице
+    """
+    try:
+        # Проверяем существование пользователя
+        user = User.objects.get(id=user_id)
+        
+        # Получаем все связи пользователь-псевдоним
+        user_pseudos = UserPseudoName.objects.filter(user=user).select_related('pseudo_name')
+        
+        # Пагинация
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        paginator = Paginator(user_pseudos, page_size)
+        page_obj = paginator.get_page(page)
+        
+        # Сериализация
+        serializer = serializers.UserPseudoNameDetailSerializer(page_obj, many=True)
+        
+        return Response({
+            "status": "success",
+            "user_id": user_id,
+            "count": paginator.count,
+            "total_pages": paginator.num_pages,
+            "current_page": page_obj.number,
+            "results": serializer.data
+        })
+
+    except User.DoesNotExist:
+        return Response(
+            {
+                "status": "error",
+                "error": "Пользователь не найден",
+                "user_id": user_id
+            },
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {
+                "status": "error",
+                "error": str(e)
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

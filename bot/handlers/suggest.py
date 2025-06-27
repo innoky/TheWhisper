@@ -13,7 +13,7 @@ from db.wapi import get_last_post, try_create_post, mark_post_as_posted, mark_po
 ACTIVE_START_HOUR = 10  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
 POST_INTERVAL_MINUTES = 30
-
+BOT_NAME = os.getenv("BOT_NAME")
 
 def save_post_to_db(user_id: int, text: str):
     # Заглушка под сохранение в БД
@@ -23,7 +23,21 @@ def save_post_to_db(user_id: int, text: str):
 def register_suggest_handler(dp: Dispatcher):
     @dp.message()
     async def suggest_handler(message: types.Message, state: FSMContext):
-        if message.chat.type == 'private':
+      
+        if message.from_user and message.from_user.first_name == "Telegram":
+            comment_url = f"https://t.me/{BOT_NAME}?start={message.message_id}"
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="💬 Комментировать", url=comment_url)]
+                ]
+            )
+            await message.reply(
+                "💬 <b>Теперь вы можете оставить анонимный комментарий к этому посту тут:</b>",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
+            ) 
+
+        elif message.chat.type == 'private':
             msg = await message.copy_to(os.getenv('OFFERS_CHAT_ID'))
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[

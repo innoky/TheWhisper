@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Comment, Post
+from .models import User, Comment, Post, PseudoNames, UserPseudoName
 
 class UserIdSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(required=True, min_value=1)
@@ -53,3 +53,36 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = '__all__' 
+
+class UserPseudoNameSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(required=True)
+    pseudo_name_id = serializers.IntegerField(required=True)
+
+class PseudoNameCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100, required=True)
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=0)
+    is_available = serializers.BooleanField(required=False, default=True)
+
+class DeactivatePseudoNameSerializer(serializers.Serializer):
+    pseudo_name_id = serializers.IntegerField(required=True, min_value=1)
+
+class PseudoNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PseudoNames
+        fields = ['id', 'name', 'price', 'is_available']
+    
+class UserPseudoNameDetailSerializer(serializers.ModelSerializer):
+    pseudo_name = serializers.SerializerMethodField()
+    purchase_date = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
+
+    class Meta:
+        model = UserPseudoName
+        fields = ['id', 'pseudo_name', 'purchase_date']
+
+    def get_pseudo_name(self, obj):
+        return {
+            'id': obj.pseudo_name.id,
+            'name': obj.pseudo_name.name,
+            'price': str(obj.pseudo_name.price),
+            'is_available': obj.pseudo_name.is_available
+        }
