@@ -6,15 +6,27 @@ from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeybo
 from aiogram.filters import CommandStart
 
 import logging
-from db.wapi import leave_anon_comment, get_user_pseudo_names, is_user_banned
+from db.wapi import leave_anon_comment, get_user_pseudo_names_full, is_user_banned, ensure_user_has_default_pseudos, get_comment_by_telegram_id, send_comment_reply_notification
 import os
-from keyboards.reply import build_market_keyboard
+from keyboards.reply import build_nick_choice_keyboard
 
 NICKS_PER_PAGE = 5
 CHAT_ID = os.getenv("CHAT_ID")
 TARGET_CHAT_ID = os.getenv("TARGET_CHAT_ID")
 BOT_NAME = os.getenv("BOT_NAME")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+
+# Проверяем, что все необходимые переменные окружения установлены
+if not all([CHAT_ID, TARGET_CHAT_ID, BOT_NAME, ADMIN_CHAT_ID]):
+    raise ValueError("Не все необходимые переменные окружения установлены: CHAT_ID, TARGET_CHAT_ID, BOT_NAME, ADMIN_CHAT_ID")
+
+def get_channel_id_for_link():
+    """Возвращает CHAT_ID без префикса -100 для использования в ссылках"""
+    if not CHAT_ID:
+        return ""
+    if CHAT_ID.startswith('-100'):
+        return CHAT_ID[4:]  # Убираем префикс -100
+    return CHAT_ID
 
 class CommentState(StatesGroup):
     waiting_for_comment = State()
@@ -33,8 +45,15 @@ def register_comment_handlers(dp: Dispatcher):
 
     @dp.message(CommentState.waiting_for_comment, F.photo)
     async def handle_photo(message: types.Message, state: FSMContext):
-        pseudo_names = await get_user_pseudo_names(message.from_user.id)
+        logging.info(f"[handle_photo] User {message.from_user.id} trying to comment with photo")
+
+        # Убеждаемся, что у пользователя есть псевдонимы
+        await ensure_user_has_default_pseudos(message.from_user.id)
+
+        pseudo_names = await get_user_pseudo_names_full(message.from_user.id)
+        logging.info(f"[handle_photo] User {message.from_user.id} has pseudo_names: {pseudo_names}")
         if not pseudo_names:
+            logging.warning(f"[handle_photo] User {message.from_user.id} has no pseudo names after ensuring")
             await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
@@ -44,7 +63,7 @@ def register_comment_handlers(dp: Dispatcher):
             caption=message.caption or "",
             nick_page=0
         )
-        kb = build_market_keyboard(pseudo_names, page=0)
+        kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
             f"🖼️ <b>Ваша фотография с подписью:</b>\n\n<blockquote>{message.caption or ''}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
@@ -57,29 +76,72 @@ def register_comment_handlers(dp: Dispatcher):
         data = await state.get_data()
         target_message_id = data.get("target_message_id")
         try:
-            await message.bot.send_animation(
+            if not TARGET_CHAT_ID:
+                raise ValueError("TARGET_CHAT_ID не установлен")
+            if not message.animation:
+                raise ValueError("Animation не найдено")
+            msg = await message.bot.send_animation(
                 chat_id=TARGET_CHAT_ID,
                 animation=message.animation.file_id,
                 reply_to_message_id=target_message_id,
                 allow_sending_without_reply=True,
             )
             await message.answer(
-                f"✅ <b>Анонимная гифка опубликована!</b>\n\n<blockquote><b><a href=\"t.me/c/{CHAT_ID}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                f"✅ <b>Анонимная гифка опубликована!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML
             )
+
+            # Сохраняем комментарий через API
+            comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=message.from_user.id, content="[GIF]")
+            logging.info(f"[handle_gif] Comment saved to DB: {comment_result}")
+
             # Отправка в админ-чат с кнопкой Забанить
             ban_keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{message.from_user.id}")]
                 ]
             )
+            if not ADMIN_CHAT_ID:
+                raise ValueError("ADMIN_CHAT_ID не установлен")
             await message.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{CHAT_ID}/{target_message_id}\n\n[GIF]",
+                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[GIF]",
                 reply_markup=ban_keyboard,
                 parse_mode=ParseMode.HTML
             )
+
+            # Проверяем, является ли это ответом на другой комментарий
+            if target_message_id and 'error' not in comment_result:
+                logging.info(f"[handle_gif] Checking if comment {target_message_id} is a reply to another comment")
+
+                # Получаем информацию о комментарии, на который отвечаем
+                original_comment = await get_comment_by_telegram_id(target_message_id)
+                logging.info(f"[handle_gif] Original comment data: {original_comment}")
+
+                # Проверяем, что получили валидный комментарий с автором
+                if 'error' not in original_comment and original_comment.get('author'):
+                    original_author_id = original_comment['author']
+                    original_content = original_comment.get('content', '')
+
+                    logging.info(f"[handle_gif] Found original comment author: {original_author_id}")
+                    logging.info(f"[handle_gif] Original content: {original_content}")
+
+                    # Отправляем уведомление автору оригинального комментария
+                    logging.info(f"[handle_gif] Sending notification to user {original_author_id}")
+                    await send_comment_reply_notification(
+                        bot=message.bot,
+                        original_comment_author_id=original_author_id,
+                        original_comment_content=original_content,
+                        reply_telegram_id=msg.message_id,
+                        reply_content="[GIF]"
+                    )
+                    logging.info(f"[handle_gif] Reply notification sent to user {original_author_id} for comment {target_message_id}")
+                else:
+                    logging.info(f"[handle_gif] No valid original comment found: {original_comment}")
+            else:
+                logging.info(f"[handle_gif] No target_message_id or comment save error, skipping reply notification")
+
         except Exception as e:
             logging.exception("❌ Ошибка при отправке гифки:")
             await message.answer("❌ <b>Не удалось опубликовать гифку.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
@@ -90,29 +152,72 @@ def register_comment_handlers(dp: Dispatcher):
         data = await state.get_data()
         target_message_id = data.get("target_message_id")
         try:
-            await message.bot.send_sticker(
+            if not TARGET_CHAT_ID:
+                raise ValueError("TARGET_CHAT_ID не установлен")
+            if not message.sticker:
+                raise ValueError("Sticker не найден")
+            msg = await message.bot.send_sticker(
                 chat_id=TARGET_CHAT_ID,
                 sticker=message.sticker.file_id,
                 reply_to_message_id=target_message_id,
                 allow_sending_without_reply=True,
             )
             await message.answer(
-                f"✅ <b>Анонимный стикер опубликован!</b>\n\n<blockquote><b><a href=\"t.me/c/{CHAT_ID}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                f"✅ <b>Анонимный стикер опубликован!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML
             )
+
+            # Сохраняем комментарий через API
+            comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=message.from_user.id, content="[STICKER]")
+            logging.info(f"[handle_sticker] Comment saved to DB: {comment_result}")
+
             # Отправка в админ-чат с кнопкой Забанить
             ban_keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{message.from_user.id}")]
                 ]
             )
+            if not ADMIN_CHAT_ID:
+                raise ValueError("ADMIN_CHAT_ID не установлен")
             await message.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{CHAT_ID}/{target_message_id}\n\n[Sticker]",
+                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[STICKER]",
                 reply_markup=ban_keyboard,
                 parse_mode=ParseMode.HTML
             )
+
+            # Проверяем, является ли это ответом на другой комментарий
+            if target_message_id and 'error' not in comment_result:
+                logging.info(f"[handle_sticker] Checking if comment {target_message_id} is a reply to another comment")
+
+                # Получаем информацию о комментарии, на который отвечаем
+                original_comment = await get_comment_by_telegram_id(target_message_id)
+                logging.info(f"[handle_sticker] Original comment data: {original_comment}")
+
+                # Проверяем, что получили валидный комментарий с автором
+                if 'error' not in original_comment and original_comment.get('author'):
+                    original_author_id = original_comment['author']
+                    original_content = original_comment.get('content', '')
+
+                    logging.info(f"[handle_sticker] Found original comment author: {original_author_id}")
+                    logging.info(f"[handle_sticker] Original content: {original_content}")
+
+                    # Отправляем уведомление автору оригинального комментария
+                    logging.info(f"[handle_sticker] Sending notification to user {original_author_id}")
+                    await send_comment_reply_notification(
+                        bot=message.bot,
+                        original_comment_author_id=original_author_id,
+                        original_comment_content=original_content,
+                        reply_telegram_id=msg.message_id,
+                        reply_content="[STICKER]"
+                    )
+                    logging.info(f"[handle_sticker] Reply notification sent to user {original_author_id} for comment {target_message_id}")
+                else:
+                    logging.info(f"[handle_sticker] No valid original comment found: {original_comment}")
+            else:
+                logging.info(f"[handle_sticker] No target_message_id or comment save error, skipping reply notification")
+
         except Exception as e:
             logging.exception("❌ Ошибка при отправке стикера:")
             await message.answer("❌ <b>Не удалось опубликовать стикер.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
@@ -120,12 +225,19 @@ def register_comment_handlers(dp: Dispatcher):
 
     @dp.message(CommentState.waiting_for_comment, F.text)
     async def handle_comment_text(message: types.Message, state: FSMContext):
+        logging.info(f"[handle_comment_text] User {message.from_user.id} trying to comment with text")
         if await is_user_banned(message.from_user.id):
             await message.answer("🚫 <b>Вы забанены и не можете оставлять комментарии.</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
-        pseudo_names = await get_user_pseudo_names(message.from_user.id)
+
+        # Убеждаемся, что у пользователя есть псевдонимы
+        await ensure_user_has_default_pseudos(message.from_user.id)
+
+        pseudo_names = await get_user_pseudo_names_full(message.from_user.id)
+        logging.info(f"[handle_comment_text] User {message.from_user.id} has pseudo_names: {pseudo_names}")
         if not pseudo_names:
+            logging.warning(f"[handle_comment_text] User {message.from_user.id} has no pseudo names after ensuring")
             await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
@@ -134,7 +246,7 @@ def register_comment_handlers(dp: Dispatcher):
             comment_text=message.text,
             nick_page=0
         )
-        kb = build_market_keyboard(pseudo_names, page=0)
+        kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
             f"💬 <b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
@@ -149,8 +261,8 @@ def register_comment_handlers(dp: Dispatcher):
             page = int(callback.data.replace("nickpage_", ""))
         except Exception:
             page = 0
-        pseudo_names = await get_user_pseudo_names(callback.from_user.id)
-        kb = build_market_keyboard(pseudo_names, page=page)
+        pseudo_names = await get_user_pseudo_names_full(callback.from_user.id)
+        kb = build_nick_choice_keyboard(pseudo_names, page=page)
         await state.update_data(nick_page=page)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
@@ -160,10 +272,10 @@ def register_comment_handlers(dp: Dispatcher):
         data = await state.get_data()
         pseudo_name_id = int(callback.data.replace("choose_nick_", ""))
         target_message_id = data.get("target_message_id")
-        pseudo_names = await get_user_pseudo_names(callback.from_user.id)
+        pseudo_names = await get_user_pseudo_names_full(callback.from_user.id)
         pseudo_name = next((pn for pn in pseudo_names if pn[0] == pseudo_name_id), None)
         media_type = data.get("media_type")
-        
+
         if media_type == "text":
             comment_text = data.get("comment_text")
             text = f"<b>{pseudo_name[1]} оставил(а) комментарий:</b>\n\n{comment_text}"
@@ -184,12 +296,58 @@ def register_comment_handlers(dp: Dispatcher):
                 )
                 await callback.message.edit_reply_markup(reply_markup=None)
                 await callback.message.answer(
-                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{CHAT_ID}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
                 # Сохраняем комментарий через новый API
-                await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=comment_text)
+                comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=comment_text)
+                logging.info(f"[choose_nick_callback] Comment saved to DB: {comment_result}")
+
+                # Отправка в админ-чат с кнопкой Забанить
+                ban_keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{callback.from_user.id}")]
+                    ]
+                )
+                await callback.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{comment_text}",
+                    reply_markup=ban_keyboard,
+                    parse_mode=ParseMode.HTML
+                )
+
+                # Проверяем, является ли это ответом на другой комментарий
+                if target_message_id and 'error' not in comment_result:
+                    logging.info(f"[choose_nick_callback] Checking if comment {target_message_id} is a reply to another comment")
+
+                    # Получаем информацию о комментарии, на который отвечаем
+                    original_comment = await get_comment_by_telegram_id(target_message_id)
+                    logging.info(f"[choose_nick_callback] Original comment data: {original_comment}")
+
+                    # Проверяем, что получили валидный комментарий с автором
+                    if 'error' not in original_comment and original_comment.get('author'):
+                        original_author_id = original_comment['author']
+                        original_content = original_comment.get('content', '')
+
+                        logging.info(f"[choose_nick_callback] Found original comment author: {original_author_id}")
+                        logging.info(f"[choose_nick_callback] Original content: {original_content}")
+
+                        # Отправляем уведомление автору оригинального комментария (включая самого себя)
+                        logging.info(f"[choose_nick_callback] Sending notification to user {original_author_id}")
+                        await send_comment_reply_notification(
+                            bot=callback.bot,
+                            original_comment_author_id=original_author_id,
+                            original_comment_content=original_content,
+                            reply_telegram_id=msg.message_id,
+                            reply_content=comment_text
+                        )
+                        logging.info(f"[choose_nick_callback] Reply notification sent to user {original_author_id} for comment {target_message_id}")
+                    else:
+                        logging.info(f"[choose_nick_callback] No valid original comment found: {original_comment}")
+                else:
+                    logging.info(f"[choose_nick_callback] No target_message_id or comment save error, skipping reply notification")
+
             except Exception as e:
                 logging.exception("❌ Ошибка при отправке комментария:")
                 await callback.message.answer("❌ <b>Не удалось опубликовать комментарий. Возможно, пост удалён.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
@@ -200,7 +358,7 @@ def register_comment_handlers(dp: Dispatcher):
             caption = data.get("caption")
             text = f"<b>{pseudo_name[1]} пришёл и оставил комментарий:</b>\n\n{caption}"
             try:
-                await callback.bot.send_photo(
+                msg = await callback.bot.send_photo(
                     chat_id=TARGET_CHAT_ID,
                     photo=photo,
                     caption=text,
@@ -209,10 +367,16 @@ def register_comment_handlers(dp: Dispatcher):
                     parse_mode=ParseMode.HTML,
                 )
                 await callback.message.answer(
-                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{CHAT_ID}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
+
+                # Сохраняем комментарий через API
+                content_for_db = f"[PHOTO] {caption}" if caption else "[PHOTO]"
+                comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=content_for_db)
+                logging.info(f"[choose_nick_callback] Photo comment saved to DB: {comment_result}")
+
                 # Отправка в админ-чат с кнопкой Забанить
                 ban_keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -221,14 +385,45 @@ def register_comment_handlers(dp: Dispatcher):
                 )
                 await callback.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{CHAT_ID}/{target_message_id}\n\n{caption}",
+                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{caption}",
                     reply_markup=ban_keyboard,
                     parse_mode=ParseMode.HTML
                 )
+
+                # Проверяем, является ли это ответом на другой комментарий
+                if target_message_id and 'error' not in comment_result:
+                    logging.info(f"[choose_nick_callback] Checking if photo comment {target_message_id} is a reply to another comment")
+
+                    # Получаем информацию о комментарии, на который отвечаем
+                    original_comment = await get_comment_by_telegram_id(target_message_id)
+                    logging.info(f"[choose_nick_callback] Original comment data: {original_comment}")
+
+                    # Проверяем, что получили валидный комментарий с автором
+                    if 'error' not in original_comment and original_comment.get('author'):
+                        original_author_id = original_comment['author']
+                        original_content = original_comment.get('content', '')
+
+                        logging.info(f"[choose_nick_callback] Found original comment author: {original_author_id}")
+                        logging.info(f"[choose_nick_callback] Original content: {original_content}")
+
+                        # Отправляем уведомление автору оригинального комментария
+                        logging.info(f"[choose_nick_callback] Sending notification to user {original_author_id}")
+                        await send_comment_reply_notification(
+                            bot=callback.bot,
+                            original_comment_author_id=original_author_id,
+                            original_comment_content=original_content,
+                            reply_telegram_id=msg.message_id,
+                            reply_content=content_for_db
+                        )
+                        logging.info(f"[choose_nick_callback] Reply notification sent to user {original_author_id} for comment {target_message_id}")
+                    else:
+                        logging.info(f"[choose_nick_callback] No valid original comment found: {original_comment}")
+                else:
+                    logging.info(f"[choose_nick_callback] No target_message_id or comment save error, skipping reply notification")
+
             except Exception as e:
                 logging.exception("❌ Ошибка при отправке комментария:")
                 await callback.message.answer("❌ <b>Не удалось опубликовать комментарий. Возможно, пост удалён.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
             await state.clear()
             await callback.answer("Комментарий отправлен!", show_alert=True)
 
-   

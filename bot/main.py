@@ -7,12 +7,13 @@ from middlewares.logging import LoggingMiddleware
 from SugQueue import post_checker
 
 # Импортируем хендлеры для регистрации
-
 from handlers.start import register_start_handlers
 from handlers.suggest import register_suggest_handler
 from handlers.comment import register_comment_handlers
 from handlers.admin import register_admin_handlers
 from handlers.market import register_market_handlers
+from handlers.account import register_account_handlers
+from handlers.help import register_help_handlers
 
 
 def register_handlers(dp: Dispatcher):
@@ -23,7 +24,6 @@ def register_handlers(dp: Dispatcher):
 async def queue_worker(bot: Bot):
     """Фоновая задача для обработки очереди"""
     await post_checker(bot)
-          
 
 
 async def on_startup(bot):
@@ -45,16 +45,22 @@ def main():
         ]
     )
     BOT_TOKEN = os.getenv('BOT_TOKEN')
+    if not BOT_TOKEN:
+        raise ValueError("BOT_TOKEN environment variable is not set")
     bot = Bot(token=BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     dp.update.middleware(LoggingMiddleware())
+    
     # Импорт хендлеров уже регистрирует их через декораторы
     register_comment_handlers(dp)
+    register_admin_handlers(dp)  # Админские команды
+    register_help_handlers(dp)   # Объединенная команда help
     register_start_handlers(dp)
     register_market_handlers(dp)
-    register_admin_handlers(dp)
+    register_account_handlers(dp)
     register_suggest_handler(dp)
+   
     
     print("Bot started!")
     dp.startup.register(on_startup)

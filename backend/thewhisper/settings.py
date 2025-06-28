@@ -53,6 +53,8 @@ REST_FRAMEWORK = {
         "%Y-%m-%dT%H:%M:%S%z",  # С зоной
         "%Y-%m-%dT%H:%M:%S",    # Без зоны (будет считать локальным)
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
 }
 
 MIDDLEWARE = [
