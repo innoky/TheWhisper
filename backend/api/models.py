@@ -7,6 +7,7 @@ class User(models.Model):
     firstname = models.CharField(max_length=100, null=True, blank=True)
     lastname = models.CharField(max_length=100, null=True, blank=True)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0) 
+    level = models.IntegerField(default=1, help_text='Уровень пользователя от 1 до 10')
    
     is_admin = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
@@ -59,6 +60,11 @@ class Post(models.Model):
     is_posted = models.BooleanField(default=False)
 
     telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
+
+    channel_message_id = models.BigIntegerField(null=True, blank=True)  # ID сообщения в канале
+    channel_posted_at = models.DateTimeField(null=True, blank=True)     # Когда был выложен в канал
+    is_paid = models.BooleanField(default=False)                        # Получена ли оплата
+    paid_at = models.DateTimeField(null=True, blank=True)               # Когда была выплачена оплата
 
     class Meta:
         db_table = "posts"
