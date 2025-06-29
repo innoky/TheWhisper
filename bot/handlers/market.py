@@ -18,6 +18,8 @@ async def try_purchase_pseudo(user_id: int, pseudo_id: int) -> dict:
 def register_market_handlers(dp: Dispatcher):
     @dp.message(F.text == "/market")
     async def market_handler(message: types.Message):
+        if not(message.chat.type == "private"):
+            return
         logging.info(f"[market_handler] User {message.from_user.id} requested /market")
         pseudos = await get_all_pseudo_names()
         

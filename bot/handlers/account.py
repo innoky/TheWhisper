@@ -6,6 +6,8 @@ import logging
 def register_account_handlers(dp: Dispatcher):
     @dp.message(F.text == "/account")
     async def account_handler(message: types.Message):
+        if not(message.chat.type == "private"):
+            return
         user_id = message.from_user.id
         current_username = message.from_user.username
         current_firstname = message.from_user.first_name
