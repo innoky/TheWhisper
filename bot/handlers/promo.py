@@ -106,8 +106,20 @@ def register_promo_handlers(dp: Dispatcher):
         
         # Получаем информацию о промокоде
         promo_info = await get_promo_code_by_code(promo_name)
+        logging.info(f"[activate_promo_handler] Promo info result: {promo_info}")
         
         if isinstance(promo_info, dict) and promo_info.get('error'):
+            logging.info(f"[activate_promo_handler] Promo code {promo_name} not found")
+            await message.answer(
+                f'<b>❌ Промокод "{promo_name}" не найден!</b>\n\n'
+                'Проверьте правильность написания промокода.',
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Проверяем точное совпадение названия промокода
+        if promo_info.get('code') != promo_name:
+            logging.info(f"[activate_promo_handler] Promo code name mismatch: requested '{promo_name}', found '{promo_info.get('code')}'")
             await message.answer(
                 f'<b>❌ Промокод "{promo_name}" не найден!</b>\n\n'
                 'Проверьте правильность написания промокода.',
@@ -136,8 +148,11 @@ def register_promo_handlers(dp: Dispatcher):
         
         # Проверяем, не активировал ли пользователь уже этот промокод
         activation_check = await check_user_promo_code_activation(message.from_user.id, promo_info['id'])
+        logging.info(f"[activate_promo_handler] Activation check result: {activation_check}")
         
-        if not isinstance(activation_check, dict) or not activation_check.get('error'):
+        # Если activation_check НЕ содержит ошибку, значит активация найдена (пользователь уже использовал промокод)
+        if isinstance(activation_check, dict) and not activation_check.get('error'):
+            logging.info(f"[activate_promo_handler] User {message.from_user.id} already activated promo code {promo_name}")
             # Пользователь уже активировал этот промокод
             await message.answer(
                 f'<b>❌ Вы уже активировали промокод "{promo_name}"!</b>\n\n'
@@ -146,8 +161,11 @@ def register_promo_handlers(dp: Dispatcher):
             )
             return
         
+        logging.info(f"[activate_promo_handler] User {message.from_user.id} can activate promo code {promo_name}")
+        
         # Активируем промокод
         activation_result = await activate_promo_code(message.from_user.id, promo_info['id'])
+        logging.info(f"[activate_promo_handler] Activation result: {activation_result}")
         
         if isinstance(activation_result, dict) and activation_result.get('error'):
             error_msg = activation_result.get('error', 'Неизвестная ошибка')

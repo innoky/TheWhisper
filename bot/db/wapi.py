@@ -1254,10 +1254,21 @@ async def check_user_promo_code_activation(user_id: int, promo_code_id: int) -> 
             async with session.get(API_URL, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
+                    logging.info(f"[check_user_promo_code_activation] Raw response: {data}")
+                    
+                    # Проверяем, есть ли активация для конкретного пользователя и промокода
                     if isinstance(data, list) and len(data) > 0:
-                        return data[0]
+                        # Ищем активацию именно для этого пользователя
+                        for activation in data:
+                            if activation.get('user') == user_id and activation.get('promo_code') == promo_code_id:
+                                return activation
+                        return {"error": "Activation not found"}
                     elif isinstance(data, dict) and 'results' in data and len(data['results']) > 0:
-                        return data['results'][0]
+                        # Ищем активацию именно для этого пользователя
+                        for activation in data['results']:
+                            if activation.get('user') == user_id and activation.get('promo_code') == promo_code_id:
+                                return activation
+                        return {"error": "Activation not found"}
                     else:
                         return {"error": "Activation not found"}
                 else:
