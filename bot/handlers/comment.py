@@ -300,6 +300,13 @@ def register_comment_handlers(dp: Dispatcher):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
+                # Убираем кнопку "Отмена" из основного сообщения
+                await callback.message.edit_reply_markup(reply_markup=None)
+                await callback.message.edit_text(
+                    callback.message.text,
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode=ParseMode.HTML
+                )
                 # Сохраняем комментарий через новый API
                 comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=comment_text)
                 logging.info(f"[choose_nick_callback] Comment saved to DB: {comment_result}")
@@ -371,7 +378,13 @@ def register_comment_handlers(dp: Dispatcher):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
-
+                # Убираем кнопку "Отмена" из основного сообщения
+                await callback.message.edit_reply_markup(reply_markup=None)
+                await callback.message.edit_text(
+                    callback.message.text,
+                    reply_markup=ReplyKeyboardRemove(),
+                    parse_mode=ParseMode.HTML
+                )
                 # Сохраняем комментарий через API
                 content_for_db = f"[PHOTO] {caption}" if caption else "[PHOTO]"
                 comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=content_for_db)
