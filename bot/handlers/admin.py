@@ -11,6 +11,9 @@ from datetime import datetime, timezone, timedelta
 import os
 import difflib
 
+# Импортируем константы из suggest
+POST_INTERVAL_MINUTES = 30
+
 async def is_admin(user_id: int) -> bool:
     """
     Проверяет, является ли пользователь администратором.
@@ -567,7 +570,7 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        """Показывает информацию о всех постах в очереди"""
+        """Показывает подробную информацию о всех постах в очереди"""
         if not await is_admin(message.from_user.id):
             await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
             return
@@ -578,38 +581,97 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}")
             return
         
-        posts = queue_info.get('posts', [])
-        count = queue_info.get('count', 0)
+        posts = queue_info.get('results', [])
+        count = len(posts)
         
         if count == 0:
-            await message.answer("<b>Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
+            await message.answer("<b>📋 Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
             return
         
-        # Формируем сообщение с информацией о постах
-        queue_message = f"<b>Очередь постов</b>\n\n"
-        queue_message += f"<b>Всего в очереди:</b> {count} постов\n\n"
+        # Формируем сообщение с подробной информацией о постах
+        queue_message = f"<b>📋 Очередь постов</b>\n\n"
+        queue_message += f"<b>Всего в очереди:</b> {count} постов\n"
+        queue_message += f"<b>Время запроса:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
         
         for i, post in enumerate(posts, 1):
             author_id = post.get('author', 'N/A')
-            content = post.get('content', '')[:50] + '...' if len(post.get('content', '')) > 50 else post.get('content', '')
+            content = post.get('content', '')
             posted_at_str = post.get('posted_at', 'N/A')
             post_id = post.get('id', 'N/A')
+            telegram_id = post.get('telegram_id', 'N/A')
             
-            # Парсим время публикации
+            # Парсим время публикации и рассчитываем время до публикации
             try:
                 if posted_at_str and ('+' in posted_at_str or 'Z' in posted_at_str):
                     posted_dt = datetime.strptime(posted_at_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
                     posted_dt = posted_dt.astimezone(timezone(timedelta(hours=3)))
                     formatted_time = posted_dt.strftime('%d.%m.%Y в %H:%M')
+                    
+                    # Рассчитываем время до публикации
+                    now = datetime.now(timezone(timedelta(hours=3)))
+                    time_diff = (posted_dt - now).total_seconds()
+                    
+                    if time_diff > 0:
+                        hours = int(time_diff // 3600)
+                        minutes = int((time_diff % 3600) // 60)
+                        if hours > 0:
+                            time_until = f"через {hours}ч {minutes}м"
+                        else:
+                            time_until = f"через {minutes}м"
+                        status_emoji = "⏳"
+                    else:
+                        time_until = "готов к публикации"
+                        status_emoji = "✅"
                 else:
                     formatted_time = posted_at_str
-            except:
+                    time_until = "неизвестно"
+                    status_emoji = "❓"
+            except Exception as e:
                 formatted_time = posted_at_str
+                time_until = "ошибка парсинга"
+                status_emoji = "❌"
             
-            queue_message += f"<b>{i}.</b> 👤 <b>Автор:</b> {author_id}\n"
-            queue_message += f"📝 <b>Контент:</b> {content}\n"
+            # Обрезаем контент для отображения
+            content_preview = content[:80] + '...' if len(content) > 80 else content
+            if not content_preview.strip():
+                content_preview = "<i>Контент не найден</i>"
+            
+            queue_message += f"<b>{i}.</b> {status_emoji} <b>Пост #{post_id}</b>\n"
+            queue_message += f"👤 <b>Автор:</b> {author_id}\n"
+            queue_message += f"📝 <b>Контент:</b> {content_preview}\n"
             queue_message += f"⏰ <b>Время публикации:</b> {formatted_time}\n"
-            queue_message += f"🆔 <b>ID поста:</b> {post_id}\n\n"
+            queue_message += f"🕐 <b>Статус:</b> {time_until}\n"
+            queue_message += f"🆔 <b>Telegram ID:</b> {telegram_id}\n"
+            queue_message += f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        # Добавляем информацию о следующем посте
+        if posts:
+            first_post = posts[0]
+            first_post_time = first_post.get('posted_at')
+            if first_post_time:
+                try:
+                    if '+' in first_post_time or 'Z' in first_post_time:
+                        first_dt = datetime.strptime(first_post_time.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
+                        first_dt = first_dt.astimezone(timezone(timedelta(hours=3)))
+                        now = datetime.now(timezone(timedelta(hours=3)))
+                        time_to_first = (first_dt - now).total_seconds()
+                        
+                        if time_to_first > 0:
+                            hours = int(time_to_first // 3600)
+                            minutes = int((time_to_first % 3600) // 60)
+                            if hours > 0:
+                                next_post_info = f"через {hours}ч {minutes}м"
+                            else:
+                                next_post_info = f"через {minutes}м"
+                        else:
+                            next_post_info = "готов к публикации"
+                        
+                        queue_message += f"<b>📊 Информация:</b>\n"
+                        queue_message += f"• Следующий пост: {next_post_info}\n"
+                        queue_message += f"• Интервал между постами: {POST_INTERVAL_MINUTES} минут\n"
+                        queue_message += f"• Неактивное время: 01:00-10:00 (посты переносятся на 10:00)\n"
+                except:
+                    pass
         
         await message.answer(queue_message, parse_mode="HTML")
 
