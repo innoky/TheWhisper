@@ -309,6 +309,13 @@ def register_suggest_handler(dp: Dispatcher):
                 except ValueError as e:
                     scheduled_time = now
 
+        # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
+        scheduled_hour = scheduled_time.hour
+        if 1 <= scheduled_hour < 10:
+            # Переносим время на 10:00 того же дня
+            scheduled_time = scheduled_time.replace(hour=10, minute=0, second=0, microsecond=0)
+            logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
+
         # Получаем тип контента и текст для БД
         content_type, post_content = get_content_type_and_text(original_msg)
         if not post_content:
