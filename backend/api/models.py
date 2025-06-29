@@ -106,3 +106,72 @@ class UserPseudoName(models.Model):
     class Meta:
         db_table = "user_pseudo_names"
         unique_together = ('user', 'pseudo_name') 
+
+
+class PromoCode(models.Model):
+    id = models.AutoField(primary_key=True)
+    code = models.CharField(max_length=50, unique=True, help_text='Код промокода (например: nuke_123)')
+    description = models.TextField(blank=True, help_text='Описание промокода')
+    reward_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Сумма награды в токенах')
+    max_uses = models.IntegerField(default=1, help_text='Максимальное количество использований (0 = безлимит)')
+    current_uses = models.IntegerField(default=0, help_text='Текущее количество использований')
+    is_active = models.BooleanField(default=True, help_text='Активен ли промокод')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text='Дата истечения промокода (null = бессрочно)')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_promo_codes', help_text='Кто создал промокод')
+
+    class Meta:
+        db_table = "promo_codes"
+        ordering = ['-created_at']
+        verbose_name = "Promo Code"
+        verbose_name_plural = "Promo Codes"
+
+    def __str__(self):
+        return f"{self.code} ({self.reward_amount} т.)"
+
+    @property
+    def is_expired(self):
+        """Проверяет, истек ли срок действия промокода"""
+        if self.expires_at is None:
+            return False
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    @property
+    def can_be_used(self):
+        """Проверяет, можно ли использовать промокод"""
+        if not self.is_active:
+            return False
+        if self.is_expired:
+            return False
+        if self.max_uses > 0 and self.current_uses >= self.max_uses:
+            return False
+        return True
+
+
+class PromoCodeActivation(models.Model):
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='promo_code_activations')
+    promo_code = models.ForeignKey(PromoCode, on_delete=models.CASCADE, related_name='activations')
+    activated_at = models.DateTimeField(auto_now_add=True)
+    reward_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text='Сумма награды, полученная при активации')
+
+    class Meta:
+        db_table = "promo_code_activations"
+        ordering = ['-activated_at']
+        unique_together = ('user', 'promo_code')  # Пользователь может активировать промокод только один раз
+        verbose_name = "Promo Code Activation"
+        verbose_name_plural = "Promo Code Activations"
+
+    def __str__(self):
+        return f"{self.user.id} activated {self.promo_code.code}"
+
+    def save(self, *args, **kwargs):
+        """При сохранении увеличиваем счетчик использований промокода и устанавливаем reward_amount"""
+        if not self.pk:  # Только при создании новой записи
+            # Устанавливаем reward_amount из промокода, если не задан
+            if not self.reward_amount:
+                self.reward_amount = self.promo_code.reward_amount
+            self.promo_code.current_uses += 1
+            self.promo_code.save()
+        super().save(*args, **kwargs) 

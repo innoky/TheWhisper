@@ -1,204 +1,159 @@
-# TheWhisper - Индекс проекта
+# TheWhisper Project Index
 
-## Обзор проекта
-TheWhisper - это Telegram-бот для анонимной публикации постов с системой модерации, комментариев и токен-экономики. Проект состоит из трех основных компонентов:
-- **Bot** - Telegram бот на aiogram
-- **Backend** - Django REST API
-- **Database** - PostgreSQL
+## Project Overview
+TheWhisper is a Telegram bot application with a Django backend API for managing pseudo names and user interactions.
 
-## Структура проекта
+## Project Structure
 
-### Корневая директория
-```
-/
-├── .git/                    # Git репозиторий
-├── .gitignore              # Исключения Git
-├── docker-compose.yml      # Docker Compose конфигурация
-├── add_default_pseudos.py  # Скрипт добавления псевдонимов
-├── test_pseudo_functions.py # Тесты функций псевдонимов
-├── test_scheduling_logic.py # Тесты логики планирования
-├── venv/                   # Виртуальное окружение Python
-├── bot/                    # Telegram бот
-├── backend/                # Django API
-└── frontend/               # Frontend (пустая директория)
-```
+### Root Directory
+- `PROJECT_INDEX.md` - This comprehensive project index file
+- `add_default_pseudos.py` - Script to add default pseudo names to the database
+- `test_pseudo_functions.py` - Test script for pseudo name functionality
+- `test_scheduling_logic.py` - Test script for scheduling logic
+- `docker-compose.yml` - Docker Compose configuration for the entire project
+- `.gitignore` - Git ignore rules
 
-### Bot (Telegram бот)
+### Bot Directory (`/bot`)
+Main Telegram bot application built with aiogram.
 
-#### Основные файлы
-- **`main.py`** (70 строк) - Главный файл бота, инициализация и запуск
-- **`SugQueue.py`** (202 строки) - Система очереди постов и публикации в канал
-- **`requirements.txt`** (28 зависимостей) - Зависимости бота
-- **`Dockerfile`** (14 строк) - Docker образ для бота
-- **`PAYMENT_SYSTEM.md`** (85 строк) - Документация платежной системы
+#### Core Files
+- `main.py` - Main bot entry point and initialization
+- `SugQueue.py` - Suggestion queue management system (16KB, 277 lines)
+- `requirements.txt` - Python dependencies for the bot
+- `Dockerfile` - Docker configuration for the bot
+- `PAYMENT_SYSTEM.md` - Documentation for the payment system
 
-#### Handlers (Обработчики команд)
-- **`handlers/start.py`** (60 строк) - Обработка команды /start
-- **`handlers/suggest.py`** (587 строк) - Основная логика отправки постов
-- **`handlers/comment.py`** (322 строки) - Система комментариев
-- **`handlers/admin.py`** (462 строки) - Административные команды
-- **`handlers/market.py`** (186 строк) - Магазин псевдонимов
-- **`handlers/account.py`** (125 строк) - Управление аккаунтом
-- **`handlers/help.py`** (96 строк) - Справка и помощь
-- **`handlers/start_old.py`** (98 строк) - Старая версия start
+#### Handlers (`/bot/handlers`)
+Telegram bot message and callback handlers.
 
-#### База данных
-- **`db/wapi.py`** (990 строк) - API клиент для взаимодействия с Django backend
+- `market.py` - Market functionality for buying pseudo names (11KB, 186 lines)
+- `suggest.py` - Suggestion system for posts and content (35KB, 583 lines)
+- `comment.py` - Comment system functionality (26KB, 430 lines)
+- `admin.py` - Administrative commands and functions (38KB, 730 lines)
+- `start.py` - Start command and user onboarding (3KB, 60 lines)
+- `start_old.py` - Legacy start command implementation (5.5KB, 98 lines)
+- `help.py` - Help system and documentation (5.9KB, 82 lines)
+- `account.py` - User account management (6.8KB, 124 lines)
 
-#### Интерфейс
-- **`keyboards/reply.py`** (49 строк) - Клавиатуры и кнопки
-- **`middlewares/logging.py`** (6 строк) - Middleware для логирования
-- **`assets/messages.json`** (6 строк) - JSON с сообщениями
+#### Keyboards (`/bot/keyboards`)
+Telegram bot keyboard layouts.
 
-### Backend (Django API)
+- `reply.py` - Reply keyboard builders and layouts (1.7KB, 49 lines)
 
-#### Основные файлы
-- **`manage.py`** (23 строки) - Django management script
-- **`requirements.txt`** (10 зависимостей) - Зависимости backend
-- **`Dockerfile`** (17 строк) - Docker образ для backend
-- **`db.sqlite3`** (0 байт) - SQLite база (не используется в продакшене)
+#### Database (`/bot/db`)
+Database interaction layer.
 
-#### Django приложение
-- **`thewhisper/settings.py`** (150 строк) - Настройки Django
-- **`thewhisper/urls.py`** (24 строки) - Основные URL маршруты
-- **`thewhisper/wsgi.py`** (17 строк) - WSGI конфигурация
-- **`thewhisper/asgi.py`** (17 строк) - ASGI конфигурация
+- `wapi.py` - Web API client for database operations (60KB, 1185 lines)
 
-#### API приложение
-- **`api/models.py`** (109 строк) - Django модели данных
-- **`api/views.py`** (279 строк) - API views и бизнес-логика
-- **`api/serializers.py`** (39 строк) - Django REST serializers
-- **`api/urls.py`** (13 строк) - API URL маршруты
-- **`api/admin.py`** (4 строки) - Django admin конфигурация
-- **`api/tests.py`** (4 строки) - Тесты API
+#### Middlewares (`/bot/middlewares`)
+Bot middleware components.
 
-#### Утилиты
-- **`add_pseudos.py`** (51 строка) - Скрипт добавления псевдонимов
-- **`add_test_pseudos.py`** (51 строка) - Скрипт добавления тестовых псевдонимов
+- `logging.py` - Logging middleware (176B, 6 lines)
 
-#### Статические файлы
-- **`static/rest_framework/`** - Django REST Framework статика
-- **`static/admin/`** - Django Admin статика
+#### Assets (`/bot/assets`)
+Static assets and configuration.
 
-## Модели данных
+- `messages.json` - Message templates and text content (479B, 6 lines)
 
-### User
-- Основная модель пользователя
-- Поля: id, username, firstname, lastname, balance, level, is_admin, is_banned
+### Backend Directory (`/backend`)
+Django REST API backend application.
 
-### Post
-- Модель поста
-- Поля: author, content, media_type, posted_at, is_rejected, is_posted, telegram_id, channel_message_id, is_paid, paid_at
+#### Core Files
+- `manage.py` - Django management script
+- `requirements.txt` - Python dependencies for the backend
+- `Dockerfile` - Docker configuration for the backend
+- `db.sqlite3` - SQLite database file
+- `add_pseudos.py` - Script to add pseudo names
+- `add_test_pseudos.py` - Script to add test pseudo names
 
-### Comment
-- Модель комментария
-- Поля: reply_to, author, content, created_at, telegram_id
+#### API App (`/backend/api`)
+Main Django application for the API.
 
-### PseudoNames
-- Модель псевдонимов в магазине
-- Поля: price, pseudo, is_available
+- `views.py` - API views and endpoints (14KB, 318 lines)
+- `models.py` - Database models (4.3KB, 109 lines)
+- `serializers.py` - Django REST framework serializers (1.6KB, 39 lines)
+- `urls.py` - URL routing configuration (545B, 13 lines)
+- `admin.py` - Django admin configuration (63B, 4 lines)
+- `tests.py` - Test cases (60B, 4 lines)
+- `apps.py` - Django app configuration (138B, 7 lines)
 
-### UserPseudoName
-- Связь пользователей с купленными псевдонимами
-- Поля: user, pseudo_name, purchase_date
+##### Management Commands (`/backend/api/management/commands`)
+Django management commands.
 
-### AuthCredential & LoginToken
-- Модели для аутентификации
+##### Migrations (`/backend/api/migrations`)
+Database migration files.
 
-## Основные функции
+#### Django Settings (`/backend/thewhisper`)
+Django project configuration.
 
-### Система постов
-1. Пользователи отправляют посты боту
-2. Посты попадают в чат модерации
-3. Админы одобряют/отклоняют посты
-4. Одобренные посты планируются в очередь
-5. Система автоматически публикует посты в канал
-6. После публикации начисляются токены
+- `settings.py` - Django settings configuration (4.1KB, 150 lines)
+- `urls.py` - Main URL routing (814B, 24 lines)
+- `wsgi.py` - WSGI application entry point (397B, 17 lines)
+- `asgi.py` - ASGI application entry point (397B, 17 lines)
 
-### Система комментариев
-- Анонимные комментарии к постам
-- Ответы на комментарии
-- Уведомления о новых комментариях
+#### Static Files (`/backend/static`)
+Static file serving.
 
-### Токен-экономика
-- Начисление токенов за посты (5-50 в зависимости от уровня)
-- Покупка псевдонимов за токены
-- Система уровней пользователей
+- `rest_framework/` - Django REST framework static files
+- `admin/` - Django admin static files
 
-### Магазин псевдонимов
-- Покупка анонимных псевдонимов
-- Использование псевдонимов при комментировании
-- Управление псевдонимами админами
+### Frontend Directory (`/frontend`)
+Frontend application (currently empty).
 
-## Технологический стек
+### Virtual Environment (`/venv`)
+Python virtual environment directory.
+
+## Key Features
+
+### Bot Features
+1. **Market System** - Users can buy pseudo names
+2. **Suggestion System** - Content suggestion and queue management
+3. **Comment System** - User commenting functionality
+4. **Admin Panel** - Administrative commands and user management
+5. **Account Management** - User account and profile management
+6. **Payment Integration** - Payment system for purchasing pseudo names
+
+### Backend Features
+1. **REST API** - Django REST framework API
+2. **Database Models** - User, pseudo name, and content models
+3. **Admin Interface** - Django admin for data management
+4. **Management Commands** - Custom Django management commands
+
+## Technology Stack
 
 ### Bot
-- **aiogram 3.18.0** - Telegram Bot API framework
-- **aiohttp** - HTTP клиент
-- **psycopg2-binary** - PostgreSQL драйвер
-- **Django** - Для работы с API
+- **Framework**: aiogram (Telegram Bot API)
+- **Language**: Python
+- **Database**: SQLite (via Django API)
+- **Containerization**: Docker
 
 ### Backend
-- **Django 5.2.3** - Web framework
-- **Django REST Framework 3.16.0** - API framework
-- **psycopg2-binary** - PostgreSQL драйвер
-- **gunicorn** - WSGI сервер
-- **whitenoise** - Статические файлы
+- **Framework**: Django + Django REST Framework
+- **Language**: Python
+- **Database**: SQLite
+- **Containerization**: Docker
 
 ### Infrastructure
-- **Docker & Docker Compose** - Контейнеризация
-- **PostgreSQL 15** - База данных
-- **Nginx** (через whitenoise) - Статические файлы
+- **Orchestration**: Docker Compose
+- **Version Control**: Git
 
-## Конфигурация
+## File Size Summary
+- **Largest Files**:
+  - `bot/db/wapi.py` (60KB, 1185 lines) - Database API client
+  - `bot/handlers/admin.py` (38KB, 730 lines) - Admin functionality
+  - `bot/handlers/suggest.py` (35KB, 583 lines) - Suggestion system
+  - `bot/handlers/comment.py` (26KB, 430 lines) - Comment system
+  - `bot/SugQueue.py` (16KB, 277 lines) - Queue management
+  - `backend/api/views.py` (14KB, 318 lines) - API views
+  - `bot/handlers/market.py` (11KB, 186 lines) - Market system
 
-### Переменные окружения
-- `BOT_TOKEN` - Токен Telegram бота
-- `CHANNEL_ID` - ID канала для публикации
-- `OFFERS_CHAT_ID` - ID чата модерации
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Настройки PostgreSQL
+## Development Status
+- **Bot**: Fully implemented with comprehensive functionality
+- **Backend**: Django API implemented with models and views
+- **Frontend**: Not implemented (empty directory)
+- **Infrastructure**: Docker configuration ready
 
-### Временные зоны
-- Настроена на Europe/Moscow
-- Используется UTC в базе данных
-
-## Архитектура
-
-### Микросервисная архитектура
-1. **Bot Service** - Обработка Telegram сообщений
-2. **Backend Service** - REST API и бизнес-логика
-3. **Database Service** - PostgreSQL
-
-### Коммуникация
-- Bot ↔ Backend через HTTP API
-- Backend ↔ Database через Django ORM
-- Все сервисы в Docker network
-
-### Очередь постов
-- Фоновая задача в боте проверяет посты каждые 20 секунд
-- Автоматическая публикация по расписанию
-- Система уведомлений о статусе постов
-
-## Развертывание
-
-### Docker Compose
-```bash
-docker-compose up -d
-```
-
-### Локальная разработка
-```bash
-# Backend
-cd backend
-python manage.py runserver
-
-# Bot
-cd bot
-python main.py
-```
-
-## Мониторинг и логирование
-- Логирование в файл `app.log`
-- Логирование в stdout для Docker
-- Подробные логи API запросов
-- Логирование ошибок и исключений 
+## Recent Changes
+- Fixed HTML parsing issues in market.py handler
+- Added proper parse_mode=ParseMode.HTML for all HTML-formatted messages
+- Removed HTML tags from show_alert callback responses (not supported by Telegram API) 
