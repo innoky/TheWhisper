@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import User, Comment, Post, PseudoNames, UserPseudoName
-from .serializers import UserSerializer, CommentSerializer, PostSerializer, PseudoNameSerializer, UserPseudoNameSerializer
+from .models import User, Comment, Post, PseudoNames, UserPseudoName, PromoCode, PromoCodeActivation
+from .serializers import UserSerializer, CommentSerializer, PostSerializer, PseudoNameSerializer, UserPseudoNameSerializer, PromoCodeSerializer, PromoCodeActivationSerializer
 from decimal import Decimal
 import decimal
 from datetime import datetime, timezone
@@ -315,4 +315,14 @@ class PseudoNameViewSet(viewsets.ModelViewSet):
 class UserPseudoNameViewSet(viewsets.ModelViewSet):
     queryset = UserPseudoName.objects.all()
     serializer_class = UserPseudoNameSerializer
+    lookup_field = 'id'
+
+class PromoCodeViewSet(viewsets.ModelViewSet):
+    queryset = PromoCode.objects.all()
+    serializer_class = PromoCodeSerializer
+    lookup_field = 'id'
+
+class PromoCodeActivationViewSet(viewsets.ModelViewSet):
+    queryset = PromoCodeActivation.objects.all()
+    serializer_class = PromoCodeActivationSerializer
     lookup_field = 'id'

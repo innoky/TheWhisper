@@ -14,6 +14,7 @@ from handlers.admin import register_admin_handlers
 from handlers.market import register_market_handlers
 from handlers.account import register_account_handlers
 from handlers.help import register_help_handlers
+from handlers.promo import register_promo_handlers
 
 
 def register_handlers(dp: Dispatcher):
@@ -55,12 +56,14 @@ def main():
     # Импорт хендлеров уже регистрирует их через декораторы
     register_comment_handlers(dp)
     register_admin_handlers(dp)  # Админские команды
+    register_promo_handlers(dp)
+   
     register_help_handlers(dp)   # Объединенная команда help
     register_start_handlers(dp)
     register_market_handlers(dp)
     register_account_handlers(dp)
     register_suggest_handler(dp)
-   
+    
     
     print("Bot started!")
     dp.startup.register(on_startup)

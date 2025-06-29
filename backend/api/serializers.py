@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Comment, Post, PseudoNames, UserPseudoName
+from .models import User, Comment, Post, PseudoNames, UserPseudoName, PromoCode, PromoCodeActivation
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,3 +36,30 @@ class UserPseudoNameSerializer(serializers.ModelSerializer):
         model = UserPseudoName
         fields = ['id', 'user', 'pseudo_name', 'purchase_date']
         read_only_fields = ['purchase_date']
+
+class PromoCodeSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = PromoCode
+        fields = ['id', 'code', 'description', 'reward_amount', 'max_uses', 'current_uses', 
+                 'is_active', 'created_at', 'expires_at', 'created_by']
+        read_only_fields = ['current_uses', 'created_at', 'created_by']
+
+class PromoCodeActivationSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    promo_code = serializers.PrimaryKeyRelatedField(queryset=PromoCode.objects.all())
+    user_details = UserSerializer(source='user', read_only=True)
+    promo_code_details = PromoCodeSerializer(source='promo_code', read_only=True)
+    
+    class Meta:
+        model = PromoCodeActivation
+        fields = ['id', 'user', 'user_details', 'promo_code', 'promo_code_details', 
+                 'activated_at', 'reward_amount']
+        read_only_fields = ['activated_at', 'reward_amount']
+
+    def create(self, validated_data):
+        """Автоматически устанавливаем reward_amount из промокода"""
+        promo_code = validated_data['promo_code']
+        validated_data['reward_amount'] = promo_code.reward_amount
+        return super().create(validated_data)

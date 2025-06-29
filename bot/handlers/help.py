@@ -47,6 +47,9 @@ def register_help_handlers(dp: Dispatcher):
             help_message += f"• <code>/allpseudos</code> — список всех псевдонимов\n"
             help_message += f"• <code>/deactivate &lt;pseudo_id&gt;</code> — деактивация псевдонима\n\n"
             
+            help_message += f"<b>Управление промокодами:</b>\n"
+            help_message += f"• <code>/addpromo \"&lt;код&gt;\" &lt;токены&gt;</code> — создание промокода\n\n"
+            
             help_message += f"<b>Система автопостинга:</b>\n"
             help_message += f"• Публикация каждые 30 минут\n"
             help_message += f"• Неактивное время: 01:00-10:00\n"
@@ -65,6 +68,7 @@ def register_help_handlers(dp: Dispatcher):
             help_message += f"<b>Доступные команды:</b>\n"
             help_message += f"• <code>/account</code> — профиль и баланс токенов\n"
             help_message += f"• <code>/market</code> — магазин псевдонимов\n"
+            help_message += f"• <code>/promo &lt;код&gt;</code> — активация промокода\n"
             help_message += f"• <code>/help</code> — эта справка\n\n"
             
             help_message += f"<b>Система токенов:</b>\n"

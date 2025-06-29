@@ -1152,33 +1152,187 @@ async def recalculate_queue_after_immediate_publication():
 
 async def get_queue_info():
     """
-    Получает информацию о всех постах в очереди.
-    
-    Возвращает:
-        dict: Информация о постах в очереди или словарь с ошибкой
+    Получает информацию о текущей очереди постов
     """
     headers = {'Accept': 'application/json'}
-    API_URL = API_BASE + 'posts/?is_posted=false&is_rejected=false&ordering=posted_at'
-    
+    API_URL = API_BASE + 'posts/?is_rejected=false&is_posted=false&ordering=posted_at'
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(API_URL, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if isinstance(data, dict) and 'results' in data:
-                        queued_posts = data['results']
-                    elif isinstance(data, list):
-                        queued_posts = data
+                    if isinstance(data, list):
+                        return {"results": data, "count": len(data)}
+                    elif isinstance(data, dict) and 'results' in data:
+                        return data
                     else:
-                        queued_posts = []
-                    
-                    return {
-                        'status': 'success',
-                        'posts': queued_posts,
-                        'count': len(queued_posts)
-                    }
+                        return {"results": [], "count": 0}
                 else:
-                    return {'error': f'API request failed with status {response.status}'}
+                    error_text = await response.text()
+                    logging.error(f"[get_queue_info] API error {response.status}: {error_text}")
+                    return {"error": f"API request failed with status {response.status}", "details": error_text}
     except Exception as e:
-        logging.error(f"[get_queue_info] Exception: {e}")
-        return {'error': str(e)}
+        logging.exception("Error in get_queue_info")
+        return {"error": f"Request failed: {str(e)}"}
+
+# ==================== PROMO CODE FUNCTIONS ====================
+
+async def get_all_promo_codes() -> Union[list, dict]:
+    """
+    Получает все промокоды из базы данных
+    
+    Возвращает:
+        list: Список промокодов или dict с ошибкой
+    """
+    headers = {'Accept': 'application/json'}
+    API_URL = API_BASE + 'promo-codes/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, list):
+                        return data
+                    elif isinstance(data, dict) and 'results' in data:
+                        return data['results']
+                    else:
+                        return []
+                else:
+                    error_text = await response.text()
+                    logging.error(f"[get_all_promo_codes] API error {response.status}: {error_text}")
+                    return {"error": f"API request failed with status {response.status}", "details": error_text}
+    except Exception as e:
+        logging.exception("Error in get_all_promo_codes")
+        return {"error": f"Request failed: {str(e)}"}
+
+async def get_promo_code_by_code(code: str) -> dict:
+    """
+    Получает промокод по его коду
+    
+    Args:
+        code: Код промокода (например: 'nuke_123')
+    
+    Возвращает:
+        dict: Данные промокода или словарь с ошибкой
+    """
+    headers = {'Accept': 'application/json'}
+    API_URL = API_BASE + f'promo-codes/?code={code}'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        return data[0]
+                    elif isinstance(data, dict) and 'results' in data and len(data['results']) > 0:
+                        return data['results'][0]
+                    else:
+                        return {"error": "Promo code not found"}
+                else:
+                    error_text = await response.text()
+                    logging.error(f"[get_promo_code_by_code] API error {response.status}: {error_text}")
+                    return {"error": f"API request failed with status {response.status}", "details": error_text}
+    except Exception as e:
+        logging.exception("Error in get_promo_code_by_code")
+        return {"error": f"Request failed: {str(e)}"}
+
+async def check_user_promo_code_activation(user_id: int, promo_code_id: int) -> dict:
+    """
+    Проверяет, активировал ли пользователь конкретный промокод
+    
+    Args:
+        user_id: ID пользователя
+        promo_code_id: ID промокода
+    
+    Возвращает:
+        dict: Данные активации или словарь с ошибкой
+    """
+    headers = {'Accept': 'application/json'}
+    API_URL = API_BASE + f'promo-code-activations/?user={user_id}&promo_code={promo_code_id}'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        return data[0]
+                    elif isinstance(data, dict) and 'results' in data and len(data['results']) > 0:
+                        return data['results'][0]
+                    else:
+                        return {"error": "Activation not found"}
+                else:
+                    error_text = await response.text()
+                    logging.error(f"[check_user_promo_code_activation] API error {response.status}: {error_text}")
+                    return {"error": f"API request failed with status {response.status}", "details": error_text}
+    except Exception as e:
+        logging.exception("Error in check_user_promo_code_activation")
+        return {"error": f"Request failed: {str(e)}"}
+
+async def activate_promo_code(user_id: int, promo_code_id: int) -> dict:
+    """
+    Активирует промокод для пользователя
+    
+    Args:
+        user_id: ID пользователя
+        promo_code_id: ID промокода
+    
+    Возвращает:
+        dict: Результат активации или словарь с ошибкой
+    """
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "user": user_id,
+        "promo_code": promo_code_id
+    }
+    API_URL = API_BASE + 'promo-code-activations/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(API_URL, json=payload, headers=headers) as response:
+                result = await response.json()
+                if response.status >= 400:
+                    logging.error(f"[activate_promo_code] API error {response.status}: {result}")
+                return result
+    except Exception as e:
+        logging.exception("Error in activate_promo_code")
+        return {"error": f"Request failed: {str(e)}"}
+
+async def create_promo_code(code: str, reward_amount: float, description: str = "", max_uses: int = 1, expires_at: str = None, created_by: int = None) -> dict:
+    """
+    Создает новый промокод (только для админов)
+    
+    Args:
+        code: Код промокода
+        reward_amount: Сумма награды в токенах
+        description: Описание промокода
+        max_uses: Максимальное количество использований (0 = безлимит)
+        expires_at: Дата истечения в формате ISO (None = бессрочно)
+        created_by: ID пользователя, создавшего промокод
+    
+    Возвращает:
+        dict: Результат создания или словарь с ошибкой
+    """
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "code": code,
+        "reward_amount": reward_amount,
+        "description": description,
+        "max_uses": max_uses,
+        "is_active": True
+    }
+    
+    if expires_at:
+        payload["expires_at"] = expires_at
+    if created_by:
+        payload["created_by"] = created_by
+    
+    API_URL = API_BASE + 'promo-codes/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(API_URL, json=payload, headers=headers) as response:
+                result = await response.json()
+                if response.status >= 400:
+                    logging.error(f"[create_promo_code] API error {response.status}: {result}")
+                return result
+    except Exception as e:
+        logging.exception("Error in create_promo_code")
+        return {"error": f"Request failed: {str(e)}"}
