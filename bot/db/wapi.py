@@ -1133,7 +1133,7 @@ async def recalculate_queue_after_immediate_publication():
                             # Устанавливаем время на 10:00 того же дня
                             new_time_moscow = current_time_moscow.replace(hour=10, minute=0, second=0, microsecond=0)
                             # Конвертируем обратно в UTC
-                            current_time = new_time_moscow.astimezone(datetime.timezone.utc)
+                            current_time = new_time_moscow.astimezone(timezone.utc)
                             logging.info(f"[recalculate_queue] Post {post_id} moved from {current_time_moscow.strftime('%H:%M')} to 10:00 due to inactive hours")
                         
                         # Форматируем время для API
