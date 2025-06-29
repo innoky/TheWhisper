@@ -18,7 +18,7 @@ def get_tokens_by_level(level):
         level = 10
     
     # Формула: базовые 5 токенов + 5 токенов за каждый уровень
-    return 5 + (level - 1) * 5
+    return 50 + (level - 1) * 50
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
