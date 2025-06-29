@@ -167,11 +167,9 @@ class PromoCodeActivation(models.Model):
         return f"{self.user.id} activated {self.promo_code.code}"
 
     def save(self, *args, **kwargs):
-        """При сохранении увеличиваем счетчик использований промокода и устанавливаем reward_amount"""
+        """При сохранении устанавливаем reward_amount из промокода"""
         if not self.pk:  # Только при создании новой записи
             # Устанавливаем reward_amount из промокода, если не задан
             if not self.reward_amount:
                 self.reward_amount = self.promo_code.reward_amount
-            self.promo_code.current_uses += 1
-            self.promo_code.save()
         super().save(*args, **kwargs) 

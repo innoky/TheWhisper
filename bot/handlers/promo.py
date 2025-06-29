@@ -61,7 +61,7 @@ def register_promo_handlers(dp: Dispatcher):
             code=promo_name,
             reward_amount=tokens,
             description=f"Промокод создан администратором {message.from_user.id}",
-            max_uses=1,  # Каждый пользователь может использовать только один раз
+            max_uses=0,  # 0 = безлимит, каждый пользователь может использовать один раз
             created_by=message.from_user.id
         )
         
@@ -77,7 +77,7 @@ def register_promo_handlers(dp: Dispatcher):
             f'<b>✅ Промокод успешно создан!</b>\n\n'
             f'<b>Название:</b> <code>{promo_name}</code>\n'
             f'<b>Награда:</b> {tokens} т.\n'
-            f'<b>Использований:</b> 1 раз на пользователя\n'
+            f'<b>Использований:</b> 1 раз на каждого пользователя\n'
             f'<b>Статус:</b> Активен',
             parse_mode=ParseMode.HTML
         )
@@ -133,17 +133,6 @@ def register_promo_handlers(dp: Dispatcher):
                     parse_mode=ParseMode.HTML
                 )
                 return
-        
-        # Проверяем, не превышен ли лимит использований
-        max_uses = promo_info.get('max_uses', 1)
-        current_uses = promo_info.get('current_uses', 0)
-        if max_uses > 0 and current_uses >= max_uses:
-            await message.answer(
-                f'<b>❌ Промокод "{promo_name}" больше недоступен!</b>\n\n'
-                f'Лимит использований исчерпан.',
-                parse_mode=ParseMode.HTML
-            )
-            return
         
         # Проверяем, не активировал ли пользователь уже этот промокод
         activation_check = await check_user_promo_code_activation(message.from_user.id, promo_info['id'])
