@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Union
 import os
+import pytz
 
 API_BASE = 'http://backend:8000/api/'
 
@@ -1120,6 +1121,20 @@ async def recalculate_queue_after_immediate_publication():
                         
                         # Добавляем 30 минут к текущему времени
                         current_time = current_time + timedelta(minutes=30)
+                        
+                        # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
+                        # Конвертируем в московское время для проверки
+                        moscow_tz = pytz.timezone('Europe/Moscow')
+                        current_time_moscow = current_time.astimezone(moscow_tz)
+                        current_hour = current_time_moscow.hour
+                        
+                        # Если время попадает в неактивный период (01:00-10:00), переносим на 10:00
+                        if 1 <= current_hour < 10:
+                            # Устанавливаем время на 10:00 того же дня
+                            new_time_moscow = current_time_moscow.replace(hour=10, minute=0, second=0, microsecond=0)
+                            # Конвертируем обратно в UTC
+                            current_time = new_time_moscow.astimezone(datetime.timezone.utc)
+                            logging.info(f"[recalculate_queue] Post {post_id} moved from {current_time_moscow.strftime('%H:%M')} to 10:00 due to inactive hours")
                         
                         # Форматируем время для API
                         new_post_time = current_time.strftime("%Y-%m-%dT%H:%M:%S%z")
