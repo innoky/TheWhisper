@@ -24,17 +24,17 @@ def register_market_handlers(dp: Dispatcher):
         # Проверяем, что получили список, а не ошибку
         if isinstance(pseudos, dict) and pseudos.get("error"):
             logging.error(f"[market_handler] Error getting pseudos: {pseudos.get('error')}")
-            await message.answer(f'❌ Ошибка получения никнеймов: {pseudos.get("error", "Неизвестная ошибка")}')
+            await message.answer(f'<b>Ошибка получения псевдонимов:</b> {pseudos.get("error", "Неизвестная ошибка")}')
             return
         
         if not isinstance(pseudos, list):
             logging.error(f"[market_handler] Unexpected pseudos format: {type(pseudos)}")
-            await message.answer('❌ Неожиданный формат данных от сервера.')
+            await message.answer('<b>Неожиданный формат данных от сервера</b>')
             return
         
         if not pseudos:
             logging.warning("[market_handler] No pseudos available")
-            await message.answer('❌ В базе данных нет доступных никнеймов. Обратитесь к администратору.')
+            await message.answer('<b>В базе данных нет доступных псевдонимов.</b>\n\n<blockquote>Обратитесь к администратору</blockquote>')
             return
             
         available = [p for p in pseudos if p.get('is_available', True)]
@@ -42,7 +42,7 @@ def register_market_handlers(dp: Dispatcher):
         
         if not available:
             logging.warning("[market_handler] No available pseudos after filtering")
-            await message.answer('❌ Нет доступных для покупки никнеймов.')
+            await message.answer('<b>Нет доступных для покупки псевдонимов</b>')
             return
             
         from db.wapi import get_user_pseudo_names
@@ -54,10 +54,10 @@ def register_market_handlers(dp: Dispatcher):
         logging.info(f"[market_handler] Filtered pseudos: {[p['id'] for p in filtered]}")
         if not filtered:
             logging.info(f"[market_handler] User {message.from_user.id} has no available pseudos to buy")
-            await message.answer('У вас нет доступных для покупки никнеймов.')
+            await message.answer('<b>У вас нет доступных для покупки псевдонимов</b>\n\n<blockquote>Вы уже купили все доступные псевдонимы</blockquote>')
             return
         kb = build_market_keyboard(filtered, page=0)
-        await message.answer('<b>Доступные никнеймы:</b>', reply_markup=kb, parse_mode=ParseMode.HTML)
+        await message.answer('<b>Доступные псевдонимы:</b>', reply_markup=kb, parse_mode=ParseMode.HTML)
 
     @dp.callback_query(F.data.startswith("market_page_"))
     async def market_page_callback(callback: types.CallbackQuery):
@@ -66,15 +66,15 @@ def register_market_handlers(dp: Dispatcher):
         
         # Проверяем, что получили список, а не ошибку
         if isinstance(pseudos, dict) and pseudos.get("error"):
-            await callback.answer(f'❌ Ошибка: {pseudos.get("error", "Неизвестная ошибка")}')
+            await callback.answer(f'<b>Ошибка:</b> {pseudos.get("error", "Неизвестная ошибка")}')
             return
         
         if not isinstance(pseudos, list):
-            await callback.answer('❌ Неожиданный формат данных от сервера.')
+            await callback.answer('<b>Неожиданный формат данных от сервера</b>')
             return
         
         if not pseudos:
-            await callback.answer('❌ Нет доступных никнеймов.')
+            await callback.answer('<b>Нет доступных псевдонимов</b>')
             return
             
         available = [p for p in pseudos if p.get('is_available', True)]
@@ -183,4 +183,4 @@ def register_market_handlers(dp: Dispatcher):
             error_msg = result.get('error', str(result)) if result else "Неизвестная ошибка"
             if len(error_msg) > 200:
                 error_msg = error_msg[:200] + "..."
-            await callback.answer(f"❌ Ошибка: {error_msg}", show_alert=True) 
+            await callback.answer(f"<b>Ошибка:</b> {error_msg}", show_alert=True) 

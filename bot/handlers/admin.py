@@ -129,7 +129,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"❌ Ошибка: {user_info['error']}")
+            await message.answer(f"<b>Ошибка:</b> {user_info['error']}")
             return
         
         current_level = int(user_info.get('level', 1))
@@ -145,17 +145,17 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer(f"❌ Ошибка при повышении уровня: {result['error']}")
             return
         
-        await message.answer(f"✅ Уровень пользователя {user_id} повышен с {current_level} до {new_level}")
+        await message.answer(f"<b>Уровень пользователя {user_id} повышен с {current_level} до {new_level}</b>")
         
         # Отправляем уведомление пользователю
         try:
             if message.bot:
                 await message.bot.send_message(
                     chat_id=user_id,
-                    text=f"🎉 <b>Поздравляем! Ваш уровень повышен!</b>\n\n"
+                    text=f"<b>Ваш уровень повышен!</b>\n\n"
                          f"Старый уровень: {current_level}\n"
                          f"Новый уровень: {new_level}\n\n"
-                         f"Теперь за каждый пост вы будете получать больше токенов!",
+                         f"Теперь за каждый пост вы получаете больше токенов",
                     parse_mode="HTML"
                 )
         except Exception as e:
@@ -180,7 +180,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"❌ Ошибка: {user_info['error']}")
+            await message.answer(f"<b>Ошибка:</b> {user_info['error']}")
             return
         
         current_level = int(user_info.get('level', 1))
@@ -196,17 +196,17 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer(f"❌ Ошибка при понижении уровня: {result['error']}")
             return
         
-        await message.answer(f"⚠️ Уровень пользователя {user_id} понижен с {current_level} до {new_level}")
+        await message.answer(f"<b>Уровень пользователя {user_id} понижен с {current_level} до {new_level}</b>")
         
         # Отправляем уведомление пользователю
         try:
             if message.bot:
                 await message.bot.send_message(
                     chat_id=user_id,
-                    text=f"⚠️ <b>Ваш уровень понижен</b>\n\n"
+                    text=f"<b>Ваш уровень понижен</b>\n\n"
                          f"Старый уровень: {current_level}\n"
                          f"Новый уровень: {new_level}\n\n"
-                         f"За каждый пост вы будете получать меньше токенов.",
+                         f"За каждый пост вы получаете меньше токенов",
                     parse_mode="HTML"
                 )
         except Exception as e:
@@ -228,23 +228,23 @@ def register_admin_handlers(dp: Dispatcher):
         result = await add_pseudo_name(nickname, price)
         
         if 'id' in result:
-            pseudo_message = f"✅ <b>Псевдоним успешно добавлен!</b>\n\n"
-            pseudo_message += f"🏷️ <b>Никнейм:</b> \"{nickname}\"\n"
-            pseudo_message += f"💰 <b>Цена:</b> {price:.2f} т.\n"
-            pseudo_message += f"🆔 <b>ID:</b> {result['id']}\n"
-            pseudo_message += f"📊 <b>Статус:</b> Доступен для покупки\n"
-            pseudo_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            pseudo_message += f"👮 <b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            pseudo_message = f"<b>Псевдоним успешно добавлен</b>\n\n"
+            pseudo_message += f"<b>Имя:</b> \"{nickname}\"\n"
+            pseudo_message += f"<b>Цена:</b> {price:.2f} т.\n"
+            pseudo_message += f"<b>ID:</b> {result['id']}\n"
+            pseudo_message += f"<b>Статус:</b> Доступен для покупки\n"
+            pseudo_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+            pseudo_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
         elif 'pseudo' in result and 'unique' in str(result['pseudo']):
-            pseudo_message = f"❌ <b>Псевдоним уже существует!</b>\n\n"
-            pseudo_message += f"🏷️ <b>Никнейм:</b> \"{nickname}\"\n"
-            pseudo_message += f"🚫 <b>Ошибка:</b> Псевдоним с таким именем уже существует\n"
-            pseudo_message += f"💡 <b>Совет:</b> Используйте другое имя или проверьте существующие псевдонимы командой /allpseudos"
+            pseudo_message = f"<b>Псевдоним уже существует</b>\n\n"
+            pseudo_message += f"<b>Имя:</b> \"{nickname}\"\n"
+            pseudo_message += f"<b>Ошибка:</b> Псевдоним с таким именем уже существует\n"
+            pseudo_message += f"<b>Совет:</b> Используйте другое имя или проверьте существующие псевдонимы командой /allpseudos"
         else:
-            pseudo_message = f"❌ <b>Ошибка при добавлении псевдонима!</b>\n\n"
-            pseudo_message += f"🏷️ <b>Никнейм:</b> \"{nickname}\"\n"
-            pseudo_message += f"💰 <b>Цена:</b> {price:.2f} т.\n"
-            pseudo_message += f"🚫 <b>Ошибка:</b> {result}"
+            pseudo_message = f"<b>Ошибка при добавлении псевдонима</b>\n\n"
+            pseudo_message += f"<b>Имя:</b> \"{nickname}\"\n"
+            pseudo_message += f"<b>Цена:</b> {price:.2f} т.\n"
+            pseudo_message += f"<b>Ошибка:</b> {result}"
         
         await message.answer(pseudo_message, parse_mode="HTML")
 
@@ -272,7 +272,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'❌ Ошибка получения информации о пользователе: {user_info["error"]}')
+            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -283,17 +283,18 @@ def register_admin_handlers(dp: Dispatcher):
         
         if 'balance' in result:
             new_balance = float(result["balance"])
-            balance_message = f"💰 <b>Баланс пользователя изменен!</b>\n\n"
-            balance_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
-            balance_message += f"📊 <b>Старый баланс:</b> {old_balance:.2f} т.\n"
-            balance_message += f"➕ <b>Добавлено:</b> +{amount:.2f} т.\n"
-            balance_message += f"📈 <b>Новый баланс:</b> {new_balance:.2f} т.\n"
-            balance_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            balance_message += f"👮 <b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            balance_message = f"<b>Баланс пользователя обновлен</b>\n\n"
+            balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
+            balance_message += f"<b>Старый баланс:</b> {old_balance} т.\n"
+            balance_message += f"<b>Добавлено:</b> +{amount} т.\n"
+            balance_message += f"<b>Новый баланс:</b> {result['balance']} т.\n"
+            balance_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+            balance_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
         else:
-            balance_message = f"❌ <b>Ошибка изменения баланса!</b>\n\n"
-            balance_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
-            balance_message += f"🚫 <b>Ошибка:</b> {result}"
+            balance_message = f"<b>Ошибка обновления баланса</b>\n\n"
+            balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
+            balance_message += f"<b>Сумма:</b> {amount} т.\n"
+            balance_message += f"<b>Ошибка:</b> {result}"
         
         await message.answer(balance_message, parse_mode="HTML")
 
@@ -321,7 +322,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'❌ Ошибка получения информации о пользователе: {user_info["error"]}')
+            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -331,17 +332,17 @@ def register_admin_handlers(dp: Dispatcher):
         result = await set_balance(user_id, amount)
         
         if 'balance' in result:
-            new_balance = float(result["balance"])
-            balance_message = f"💰 <b>Баланс пользователя установлен!</b>\n\n"
-            balance_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
-            balance_message += f"📊 <b>Старый баланс:</b> {old_balance:.2f} т.\n"
-            balance_message += f"🔄 <b>Новый баланс:</b> {new_balance:.2f} т.\n"
-            balance_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            balance_message += f"👮 <b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            balance_message = f"<b>Баланс пользователя установлен</b>\n\n"
+            balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
+            balance_message += f"<b>Старый баланс:</b> {old_balance} т.\n"
+            balance_message += f"<b>Новый баланс:</b> {result['balance']} т.\n"
+            balance_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+            balance_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
         else:
-            balance_message = f"❌ <b>Ошибка установки баланса!</b>\n\n"
-            balance_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
-            balance_message += f"🚫 <b>Ошибка:</b> {result}"
+            balance_message = f"<b>Ошибка установки баланса</b>\n\n"
+            balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
+            balance_message += f"<b>Сумма:</b> {amount} т.\n"
+            balance_message += f"<b>Ошибка:</b> {result}"
         
         await message.answer(balance_message, parse_mode="HTML")
 
@@ -349,10 +350,10 @@ def register_admin_handlers(dp: Dispatcher):
     async def allpseudos_handler(message: types.Message):
         pseudos = await get_all_pseudo_names()
         if isinstance(pseudos, dict) and pseudos.get("error"):
-            await message.answer(f'❌ Ошибка: {pseudos}')
+            await message.answer(f'<b>Ошибка:</b> {pseudos}')
             return
         if not pseudos:
-            await message.answer('📋 <b>Нет псевдонимов в системе.</b>', parse_mode='HTML')
+            await message.answer('<b>Нет псевдонимов в системе</b>', parse_mode='HTML')
             return
         
         # Подсчитываем статистику
@@ -361,11 +362,11 @@ def register_admin_handlers(dp: Dispatcher):
         unavailable_count = total_count - available_count
         
         # Формируем заголовок с статистикой
-        header = f"📋 <b>Все псевдонимы ({total_count})</b>\n\n"
-        header += f"📊 <b>Статистика:</b>\n"
-        header += f"✅ Доступно: {available_count}\n"
-        header += f"❌ Недоступно: {unavailable_count}\n\n"
-        header += f"📝 <b>Список:</b>\n"
+        header = f"<b>Все псевдонимы ({total_count})</b>\n\n"
+        header += f"<b>Статистика:</b>\n"
+        header += f"Доступно: {available_count}\n"
+        header += f"Недоступно: {unavailable_count}\n\n"
+        header += f"<b>Список:</b>\n"
         
         # Формируем список псевдонимов
         lines = []
@@ -416,18 +417,18 @@ def register_admin_handlers(dp: Dispatcher):
         
         result = await deactivate_pseudo_name(pseudo_id)
         
-        if 'status' in result and result['status'] == 'deactivated':
-            deactivate_message = f"✅ <b>Псевдоним деактивирован!</b>\n\n"
-            deactivate_message += f"🏷️ <b>Никнейм:</b> \"{pseudo_name}\"\n"
-            deactivate_message += f"🆔 <b>ID:</b> {pseudo_id}\n"
-            deactivate_message += f"📊 <b>Статус:</b> Недоступен для покупки\n"
-            deactivate_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            deactivate_message += f"👮 <b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+        if 'success' in result:
+            deactivate_message = f"<b>Псевдоним деактивирован</b>\n\n"
+            deactivate_message += f"<b>Имя:</b> \"{pseudo_name}\"\n"
+            deactivate_message += f"<b>ID:</b> {pseudo_id}\n"
+            deactivate_message += f"<b>Статус:</b> Недоступен для покупки\n"
+            deactivate_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+            deactivate_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
         else:
-            deactivate_message = f"❌ <b>Ошибка деактивации псевдонима!</b>\n\n"
-            deactivate_message += f"🏷️ <b>Никнейм:</b> \"{pseudo_name}\"\n"
-            deactivate_message += f"🆔 <b>ID:</b> {pseudo_id}\n"
-            deactivate_message += f"🚫 <b>Ошибка:</b> {result}"
+            deactivate_message = f"<b>Ошибка деактивации псевдонима</b>\n\n"
+            deactivate_message += f"<b>Имя:</b> \"{pseudo_name}\"\n"
+            deactivate_message += f"<b>ID:</b> {pseudo_id}\n"
+            deactivate_message += f"<b>Ошибка:</b> {result}"
         
         await message.answer(deactivate_message, parse_mode="HTML")
 
@@ -460,47 +461,71 @@ def register_admin_handlers(dp: Dispatcher):
                 available_pseudos = sum(1 for p in pseudos if p.get('is_available', False))
             
             # Формируем статистику
-            stats_message = f"📊 <b>Статистика системы</b>\n\n"
-            stats_message += f"📅 <b>Дата:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+            stats_message = f"<b>Статистика системы</b>\n\n"
+            stats_message += f"<b>Дата:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
             
-            stats_message += f"📝 <b>Посты:</b>\n"
-            stats_message += f"📋 Всего постов: {total_posts}\n"
-            stats_message += f"✅ Опубликовано: {posted_posts}\n"
-            stats_message += f"❌ Отклонено: {rejected_posts}\n"
-            stats_message += f"⏳ В очереди: {active_posts_count}\n\n"
+            stats_message += f"<b>Посты:</b>\n"
+            stats_message += f"Всего постов: {total_posts}\n"
+            stats_message += f"Опубликовано: {posted_posts}\n"
+            stats_message += f"Отклонено: {rejected_posts}\n"
+            stats_message += f"В очереди: {active_posts_count}\n\n"
             
-            stats_message += f"🏷️ <b>Псевдонимы:</b>\n"
-            stats_message += f"📋 Всего псевдонимов: {total_pseudos}\n"
-            stats_message += f"✅ Доступно: {available_pseudos}\n"
-            stats_message += f"❌ Недоступно: {total_pseudos - available_pseudos}\n\n"
+            stats_message += f"<b>Псевдонимы:</b>\n"
+            stats_message += f"Всего псевдонимов: {total_pseudos}\n"
+            stats_message += f"Доступно: {available_pseudos}\n"
+            stats_message += f"Недоступно: {total_pseudos - available_pseudos}\n\n"
             
             # Добавляем информацию о системе
-            stats_message += f"⚙️ <b>Система:</b>\n"
-            stats_message += f"🤖 Бот: Активен\n"
-            stats_message += f"📡 API: Работает\n"
-            stats_message += f"👮 Админ: {message.from_user.username or message.from_user.first_name}"
+            stats_message += f"<b>Система:</b>\n"
+            stats_message += f"Бот: Активен\n"
+            stats_message += f"API: Работает\n"
+            stats_message += f"Админ: {message.from_user.username or message.from_user.first_name}"
             
             await message.answer(stats_message, parse_mode="HTML")
             
         except Exception as e:
-            error_message = f"❌ <b>Ошибка получения статистики!</b>\n\n"
-            error_message += f"🚫 <b>Ошибка:</b> {str(e)}\n"
-            error_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}"
+            error_message = f"<b>Ошибка получения статистики</b>\n\n"
+            error_message += f"<b>Ошибка:</b> {str(e)}\n"
+            error_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}"
             await message.answer(error_message, parse_mode="HTML")
 
     @dp.message(Command("getuser"))
     async def getuser_handler(message: types.Message):
         if not message.text:
-            await message.answer("Использование: /getuser <username>")
+            await message.answer("Использование: /getuser <username или ID>")
             return
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
-            await message.answer("Использование: /getuser <username>")
+            await message.answer("Использование: /getuser <username или ID>")
             return
         query = parts[1].strip().lstrip('@')
         if not query:
-            await message.answer("Введите ник или часть ника")
+            await message.answer("Введите ник, часть ника или ID пользователя")
             return
+        
+        # Сначала проверяем, не является ли запрос числовым ID
+        if query.isdigit():
+            user_id = int(query)
+            user_info = await get_user_info(user_id)
+            if 'error' not in user_info:
+                user = user_info
+                reply = "<b>Пользователь найден по ID:</b>\n\n"
+                reply += (
+                    f"ID: <code>{user['id']}</code>\n"
+                    f"Username: @{user.get('username') or 'N/A'}\n"
+                    f"Имя: {user.get('firstname', '')} {user.get('lastname', '')}\n"
+                    f"Баланс: {user.get('balance', 'N/A')}\n"
+                    f"Уровень: {user.get('level', 'N/A')}\n"
+                    f"Админ: {'Да' if user.get('is_admin') else 'Нет'}\n"
+                    f"Бан: {'Да' if user.get('is_banned') else 'Нет'}\n"
+                )
+                await message.answer(reply, parse_mode="HTML")
+                return
+            else:
+                await message.answer(f"Пользователь с ID {user_id} не найден")
+                return
+        
+        # Если не ID, ищем по username и имени
         users = await get_all_users()
         if not users:
             await message.answer("Не удалось получить список пользователей.")
@@ -524,7 +549,7 @@ def register_admin_handlers(dp: Dispatcher):
         scored.sort(reverse=True, key=lambda x: x[0])
         top = [u for score, u in scored if score > 0.3][:5]
         if not top:
-            await message.answer("Пользователь не найден. Попробуйте другую часть ника.")
+            await message.answer("Пользователь не найден. Попробуйте другую часть ника или ID пользователя.")
             return
         reply = "<b>Похожие пользователи:</b>\n\n"
         for u in top:
@@ -544,25 +569,25 @@ def register_admin_handlers(dp: Dispatcher):
     async def queue_handler(message: types.Message):
         """Показывает информацию о всех постах в очереди"""
         if not await is_admin(message.from_user.id):
-            await message.answer("❌ У вас нет прав для выполнения этой команды")
+            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
             return
         
         queue_info = await get_queue_info()
         
         if 'error' in queue_info:
-            await message.answer(f"❌ Ошибка получения очереди: {queue_info['error']}")
+            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}")
             return
         
         posts = queue_info.get('posts', [])
         count = queue_info.get('count', 0)
         
         if count == 0:
-            await message.answer("📋 <b>Очередь постов</b>\n\n🔄 Очередь пуста - нет запланированных постов", parse_mode="HTML")
+            await message.answer("<b>Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
             return
         
         # Формируем сообщение с информацией о постах
-        queue_message = f"📋 <b>Очередь постов</b>\n\n"
-        queue_message += f"📊 <b>Всего в очереди:</b> {count} постов\n\n"
+        queue_message = f"<b>Очередь постов</b>\n\n"
+        queue_message += f"<b>Всего в очереди:</b> {count} постов\n\n"
         
         for i, post in enumerate(posts, 1):
             author_id = post.get('author', 'N/A')
@@ -592,26 +617,26 @@ def register_admin_handlers(dp: Dispatcher):
     async def queueupdate_handler(message: types.Message):
         """Принудительно пересчитывает все времена для постов в очереди"""
         if not await is_admin(message.from_user.id):
-            await message.answer("❌ У вас нет прав для выполнения этой команды")
+            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
             return
         
-        await message.answer("🔄 Начинаю пересчет очереди...")
+        await message.answer("<b>Начинаю пересчет очереди...</b>")
         
         try:
             # Выполняем пересчет очереди
             result = await recalculate_queue_after_immediate_publication()
             
             if 'error' in result:
-                await message.answer(f"❌ Ошибка пересчета очереди: {result['error']}")
+                await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}")
                 return
             
             updated_count = result.get('updated_count', 0)
             status_message = result.get('message', 'Пересчет завершен')
             
             if updated_count == 0:
-                await message.answer("✅ Очередь пуста - нечего пересчитывать")
+                await message.answer("<b>Очередь пуста — нечего пересчитывать</b>")
             else:
-                await message.answer(f"✅ {status_message}\n\n📊 Пересчитано постов: {updated_count}")
+                await message.answer(f"<b>{status_message}</b>\n\n<b>Пересчитано постов:</b> {updated_count}")
                 
                 # Показываем обновленную очередь
                 queue_info = await get_queue_info()
@@ -620,8 +645,8 @@ def register_admin_handlers(dp: Dispatcher):
                     count = queue_info.get('count', 0)
                     
                     if count > 0:
-                        queue_message = f"📋 <b>Обновленная очередь постов</b>\n\n"
-                        queue_message += f"📊 <b>Всего в очереди:</b> {count} постов\n\n"
+                        queue_message = f"<b>Обновленная очередь постов</b>\n\n"
+                        queue_message += f"<b>Всего в очереди:</b> {count} постов\n\n"
                         
                         for i, post in enumerate(posts, 1):
                             author_id = post.get('author', 'N/A')

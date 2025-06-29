@@ -40,7 +40,7 @@ def register_comment_handlers(dp: Dispatcher):
     # Отмена комментирования. Кнопка крепится к сообщению высылаемому после /start
     async def cancel_comment(message: types.Message, state: FSMContext):
         await state.clear()
-        await message.answer("🚫 <b>Комментирование отменено.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
+        await message.answer("<b>Комментирование отменено</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
 
 
     @dp.message(CommentState.waiting_for_comment, F.photo)
@@ -54,7 +54,7 @@ def register_comment_handlers(dp: Dispatcher):
         logging.info(f"[handle_photo] User {message.from_user.id} has pseudo_names: {pseudo_names}")
         if not pseudo_names:
             logging.warning(f"[handle_photo] User {message.from_user.id} has no pseudo names after ensuring")
-            await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
+            await message.answer("<b>У вас нет купленных псевдонимов</b>\n\n<blockquote>Купите псевдоним в /market</blockquote>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
         await state.update_data(
@@ -66,7 +66,7 @@ def register_comment_handlers(dp: Dispatcher):
         kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
-            f"🖼️ <b>Ваша фотография с подписью:</b>\n\n<blockquote>{message.caption or ''}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
+            f"<b>Ваша фотография с подписью:</b>\n\n<blockquote>{message.caption or ''}</blockquote>\n\n<b>Выберите псевдоним для публикации:</b>",
             reply_markup=kb,
             parse_mode=ParseMode.HTML
         )
@@ -87,7 +87,7 @@ def register_comment_handlers(dp: Dispatcher):
                 allow_sending_without_reply=True,
             )
             await message.answer(
-                f"✅ <b>Анонимная гифка опубликована!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                f"<b>Анонимная GIF опубликована</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML
             )
@@ -99,7 +99,7 @@ def register_comment_handlers(dp: Dispatcher):
             # Отправка в админ-чат с кнопкой Забанить
             ban_keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{message.from_user.id}")]
+                    [InlineKeyboardButton(text="Забанить", callback_data=f"ban_{message.from_user.id}")]
                 ]
             )
             if not ADMIN_CHAT_ID:
@@ -163,7 +163,7 @@ def register_comment_handlers(dp: Dispatcher):
                 allow_sending_without_reply=True,
             )
             await message.answer(
-                f"✅ <b>Анонимный стикер опубликован!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                f"<b>Анонимный стикер опубликован</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                 reply_markup=ReplyKeyboardRemove(),
                 parse_mode=ParseMode.HTML
             )
@@ -175,7 +175,7 @@ def register_comment_handlers(dp: Dispatcher):
             # Отправка в админ-чат с кнопкой Забанить
             ban_keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{message.from_user.id}")]
+                    [InlineKeyboardButton(text="Забанить", callback_data=f"ban_{message.from_user.id}")]
                 ]
             )
             if not ADMIN_CHAT_ID:
@@ -227,7 +227,7 @@ def register_comment_handlers(dp: Dispatcher):
     async def handle_comment_text(message: types.Message, state: FSMContext):
         logging.info(f"[handle_comment_text] User {message.from_user.id} trying to comment with text")
         if await is_user_banned(message.from_user.id):
-            await message.answer("🚫 <b>Вы забанены и не можете оставлять комментарии.</b>", parse_mode=ParseMode.HTML)
+            await message.answer("<b>Вы забанены и не можете оставлять комментарии</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
 
@@ -238,7 +238,7 @@ def register_comment_handlers(dp: Dispatcher):
         logging.info(f"[handle_comment_text] User {message.from_user.id} has pseudo_names: {pseudo_names}")
         if not pseudo_names:
             logging.warning(f"[handle_comment_text] User {message.from_user.id} has no pseudo names after ensuring")
-            await message.answer("⚠️ <b>У вас нет купленных ников.\nКупите ник в /market.</b>", parse_mode=ParseMode.HTML)
+            await message.answer("<b>У вас нет купленных псевдонимов</b>\n\n<blockquote>Купите псевдоним в /market</blockquote>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
         await state.update_data(
@@ -249,7 +249,7 @@ def register_comment_handlers(dp: Dispatcher):
         kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
-            f"💬 <b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите ник для публикации:</b>",
+            f"<b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите псевдоним для публикации:</b>",
             reply_markup=kb,
             parse_mode=ParseMode.HTML
         )
@@ -296,7 +296,7 @@ def register_comment_handlers(dp: Dispatcher):
                 )
                 await callback.message.edit_reply_markup(reply_markup=None)
                 await callback.message.answer(
-                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                    f"<b>Комментарий опубликован анонимно</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
@@ -307,7 +307,7 @@ def register_comment_handlers(dp: Dispatcher):
                 # Отправка в админ-чат с кнопкой Забанить
                 ban_keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{callback.from_user.id}")]
+                        [InlineKeyboardButton(text="Забанить", callback_data=f"ban_{callback.from_user.id}")]
                     ]
                 )
                 await callback.bot.send_message(
@@ -349,10 +349,10 @@ def register_comment_handlers(dp: Dispatcher):
                     logging.info(f"[choose_nick_callback] No target_message_id or comment save error, skipping reply notification")
 
             except Exception as e:
-                logging.exception("❌ Ошибка при отправке комментария:")
-                await callback.message.answer("❌ <b>Не удалось опубликовать комментарий. Возможно, пост удалён.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
+                logging.exception("Ошибка при отправке комментария:")
+                await callback.message.answer("<b>Не удалось опубликовать комментарий. Возможно, пост удален</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
             await state.clear()
-            await callback.answer("Комментарий отправлен!", show_alert=True)
+            await callback.answer("Комментарий отправлен", show_alert=True)
         elif media_type == "photo":
             photo = data.get("photo")
             caption = data.get("caption")
@@ -367,7 +367,7 @@ def register_comment_handlers(dp: Dispatcher):
                     parse_mode=ParseMode.HTML,
                 )
                 await callback.message.answer(
-                    f"✅ <b>Комментарий опубликован анонимно!</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
+                    f"<b>Комментарий опубликован анонимно</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
@@ -380,7 +380,7 @@ def register_comment_handlers(dp: Dispatcher):
                 # Отправка в админ-чат с кнопкой Забанить
                 ban_keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="🚫 Забанить", callback_data=f"ban_{callback.from_user.id}")]
+                        [InlineKeyboardButton(text="Забанить", callback_data=f"ban_{callback.from_user.id}")]
                     ]
                 )
                 await callback.bot.send_message(
@@ -422,8 +422,8 @@ def register_comment_handlers(dp: Dispatcher):
                     logging.info(f"[choose_nick_callback] No target_message_id or comment save error, skipping reply notification")
 
             except Exception as e:
-                logging.exception("❌ Ошибка при отправке комментария:")
-                await callback.message.answer("❌ <b>Не удалось опубликовать комментарий. Возможно, пост удалён.</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
+                logging.exception("Ошибка при отправке комментария:")
+                await callback.message.answer("<b>Не удалось опубликовать комментарий. Возможно, пост удален</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
             await state.clear()
-            await callback.answer("Комментарий отправлен!", show_alert=True)
+            await callback.answer("Комментарий отправлен", show_alert=True)
 
