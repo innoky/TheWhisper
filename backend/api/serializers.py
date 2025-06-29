@@ -44,7 +44,7 @@ class PromoCodeSerializer(serializers.ModelSerializer):
         model = PromoCode
         fields = ['id', 'code', 'description', 'reward_amount', 'max_uses', 'current_uses', 
                  'is_active', 'created_at', 'expires_at', 'created_by']
-        read_only_fields = ['current_uses', 'created_at', 'created_by']
+        read_only_fields = ['created_at', 'created_by']
 
 class PromoCodeActivationSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
