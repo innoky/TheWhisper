@@ -33,13 +33,13 @@ async def send_publication_notification(bot: Bot, post: dict, channel_message_id
         post_link = f"https://t.me/c/{channel_id}/{channel_message_id}"
         
         # Формируем сообщение
-        notification_text = f"🎉 <b>Ваш пост опубликован!</b>\n\n"
-        notification_text += f"📝 <b>Содержание:</b>\n"
-        notification_text += f"<i>{post.get('content', '')[:100]}{'...' if len(post.get('content', '')) > 100 else ''}</i>\n\n"
-        notification_text += f"🔗 <b>Ссылка на пост:</b>\n"
+        notification_text = f"<b>Ваш пост опубликован</b>\n\n"
+        notification_text += f"<b>Содержание:</b>\n"
+        notification_text += f"«{post.get('content', '')[:100]}{'...' if len(post.get('content', '')) > 100 else ''}»\n\n"
+        notification_text += f"<b>Ссылка на пост:</b>\n"
         notification_text += f"<a href=\"{post_link}\">Открыть пост в канале</a>\n\n"
-        notification_text += f"⏰ <b>Время публикации:</b> {datetime.datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-        notification_text += f"💰 <b>Награда:</b> После проверки вы получите токены за пост!"
+        notification_text += f"<b>Время публикации:</b> {datetime.datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+        notification_text += f"<b>Награда:</b> После проверки вы получите 50-500 токенов за пост (зависит от уровня)"
         
         # Отправляем уведомление
         await bot.send_message(
@@ -74,17 +74,17 @@ async def send_publication_and_payment_notification(bot: Bot, post: dict, channe
         post_link = f"https://t.me/c/{channel_id}/{channel_message_id}"
         
         # Формируем объединенное сообщение
-        notification_text = f"🎉 <b>Ваш пост опубликован и оплачен!</b>\n\n"
-        notification_text += f"📝 <b>Содержание:</b>\n"
-        notification_text += f"<i>{post.get('content', '')[:100]}{'...' if len(post.get('content', '')) > 100 else ''}</i>\n\n"
-        notification_text += f"🔗 <b>Ссылка на пост:</b>\n"
+        notification_text = f"<b>Ваш пост опубликован и оплачен</b>\n\n"
+        notification_text += f"<b>Содержание:</b>\n"
+        notification_text += f"«{post.get('content', '')[:100]}{'...' if len(post.get('content', '')) > 100 else ''}»\n\n"
+        notification_text += f"<b>Ссылка на пост:</b>\n"
         notification_text += f"<a href=\"{post_link}\">Открыть пост в канале</a>\n\n"
-        notification_text += f"💰 <b>Награда:</b>\n"
-        notification_text += f"➕ <b>Получено токенов:</b> +{tokens_added}\n"
-        notification_text += f"📊 <b>Новый баланс:</b> {new_balance} т.\n\n"
-        notification_text += f"⏰ <b>Время публикации:</b> {datetime.datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-        notification_text += f"🎉 <b>Спасибо за качественный контент!</b>\n"
-        notification_text += f"💡 <b>Совет:</b> Используйте токены для покупки псевдонимов в магазине /market"
+        notification_text += f"<b>Награда:</b>\n"
+        notification_text += f"<b>Получено токенов:</b> +{tokens_added}\n"
+        notification_text += f"<b>Новый баланс:</b> {new_balance} т.\n\n"
+        notification_text += f"<b>Время публикации:</b> {datetime.datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+        notification_text += f"<b>Спасибо за качественный контент</b>\n"
+        notification_text += f"<b>Совет:</b> Используйте токены для покупки псевдонимов в магазине /market"
         
         # Отправляем уведомление
         await bot.send_message(
@@ -246,6 +246,7 @@ async def post_checker(bot):
                         if 'error' not in payment_result:
                             tokens_added = payment_result.get('tokens_added', 0)
                             author_balance = payment_result.get('author_balance', 'N/A')
+                            author_level = payment_result.get('author_level', 'N/A')
                             await send_publication_and_payment_notification(bot, post, channel_message_id, tokens_added, author_balance)
                         else:
                             print(f"Error processing payment for post {post['id']}: {payment_result['error']}")

@@ -969,16 +969,16 @@ async def send_comment_reply_notification(bot, original_comment_author_id: int, 
         reply_link = f"https://t.me/c/{channel_id}/{reply_telegram_id}"
         logging.info(f"[send_comment_reply_notification] Generated reply_link: {reply_link}")
         
-        # Формируем красивое уведомление
-        notification_text = f"💬 <b>Вам ответили на комментарий!</b>\n\n"
-        notification_text += f"📝 <b>Ваш комментарий:</b>\n"
-        notification_text += f"<i>«{original_comment_content[:100]}{'...' if len(original_comment_content) > 100 else ''}»</i>\n\n"
-        notification_text += f"💭 <b>Ответ:</b>\n"
-        notification_text += f"<i>«{reply_content[:100]}{'...' if len(reply_content) > 100 else ''}»</i>\n\n"
-        notification_text += f"🔗 <b>Ссылка на ответ:</b>\n"
-        notification_text += f"<a href=\"{reply_link}\">📱 Открыть ответ в канале</a>\n\n"
-        notification_text += f"⏰ <b>Время ответа:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-        notification_text += f"💡 <b>Хотите ответить?</b>\n"
+        # Формируем уведомление
+        notification_text = f"<b>Вам ответили на комментарий</b>\n\n"
+        notification_text += f"<b>Ваш комментарий:</b>\n"
+        notification_text += f"«{original_comment_content[:100]}{'...' if len(original_comment_content) > 100 else ''}»\n\n"
+        notification_text += f"<b>Ответ:</b>\n"
+        notification_text += f"«{reply_content[:100]}{'...' if len(reply_content) > 100 else ''}»\n\n"
+        notification_text += f"<b>Ссылка на ответ:</b>\n"
+        notification_text += f"<a href=\"{reply_link}\">Открыть ответ в канале</a>\n\n"
+        notification_text += f"<b>Время ответа:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+        notification_text += f"<b>Хотите ответить?</b>\n"
         notification_text += f"• Перейдите по ссылке выше\n"
         notification_text += f"• Нажмите кнопку 'Ответить' под комментарием"
         
