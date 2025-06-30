@@ -63,6 +63,8 @@ def register_comment_handlers(dp: Dispatcher):
             caption=message.caption or "",
             nick_page=0
         )
+        # Убираем обычную клавиатуру перед показом inline-клавиатуры
+        await message.answer("<i>Теперь выберите ник для публикации комментария:</i>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
         kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
@@ -246,6 +248,8 @@ def register_comment_handlers(dp: Dispatcher):
             comment_text=message.text,
             nick_page=0
         )
+        # Убираем обычную клавиатуру перед показом inline-клавиатуры
+        await message.answer("<i>Теперь выберите ник для публикации комментария:</i>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
         kb = build_nick_choice_keyboard(pseudo_names, page=0)
         await state.set_state(CommentState.waiting_for_nick)
         await message.answer(
@@ -300,20 +304,6 @@ def register_comment_handlers(dp: Dispatcher):
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
-                # Убираем кнопку "Отмена" из основного сообщения
-                try:
-                    await callback.message.edit_reply_markup(reply_markup=None)
-                    await callback.message.edit_text(
-                        callback.message.text,
-                        reply_markup=ReplyKeyboardRemove(),
-                        parse_mode=ParseMode.HTML
-                    )
-                except Exception as e:
-                    if "message is not modified" in str(e):
-                        # Сообщение уже не имеет reply_markup, это нормально
-                        logging.info(f"[choose_nick_callback] Message already has no reply_markup (normal)")
-                    else:
-                        logging.warning(f"[choose_nick_callback] Error removing reply_markup: {e}")
                 # Сохраняем комментарий через новый API
                 comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=comment_text)
                 logging.info(f"[choose_nick_callback] Comment saved to DB: {comment_result}")
@@ -380,25 +370,12 @@ def register_comment_handlers(dp: Dispatcher):
                     allow_sending_without_reply=True,
                     parse_mode=ParseMode.HTML,
                 )
+                await callback.message.edit_reply_markup(reply_markup=None)
                 await callback.message.answer(
                     f"<b>Комментарий опубликован анонимно</b>\n\n<blockquote><b><a href=\"t.me/c/{get_channel_id_for_link()}/{target_message_id}\">Вернуться к обсуждению</a></b></blockquote>",
                     reply_markup=ReplyKeyboardRemove(),
                     parse_mode=ParseMode.HTML
                 )
-                # Убираем кнопку "Отмена" из основного сообщения
-                try:
-                    await callback.message.edit_reply_markup(reply_markup=None)
-                    await callback.message.edit_text(
-                        callback.message.text,
-                        reply_markup=ReplyKeyboardRemove(),
-                        parse_mode=ParseMode.HTML
-                    )
-                except Exception as e:
-                    if "message is not modified" in str(e):
-                        # Сообщение уже не имеет reply_markup, это нормально
-                        logging.info(f"[choose_nick_callback] Message already has no reply_markup (normal)")
-                    else:
-                        logging.warning(f"[choose_nick_callback] Error removing reply_markup: {e}")
                 # Сохраняем комментарий через API
                 content_for_db = f"[PHOTO] {caption}" if caption else "[PHOTO]"
                 comment_result = await leave_anon_comment(telegram_id=msg.message_id, reply_to=target_message_id, user_id=callback.from_user.id, content=content_for_db)
