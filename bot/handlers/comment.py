@@ -356,7 +356,7 @@ def register_comment_handlers(dp: Dispatcher):
                 logging.exception("Ошибка при отправке комментария:")
                 await callback.message.answer("<b>Не удалось опубликовать комментарий. Возможно, пост удален</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
             await state.clear()
-            await callback.answer("Комментарий отправлен", show_alert=True)
+            await callback.answer("Комментарий отправлен!")
         elif media_type == "photo":
             photo = data.get("photo")
             caption = data.get("caption")
@@ -429,5 +429,5 @@ def register_comment_handlers(dp: Dispatcher):
                 logging.exception("Ошибка при отправке комментария:")
                 await callback.message.answer("<b>Не удалось опубликовать комментарий. Возможно, пост удален</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
             await state.clear()
-            await callback.answer("Комментарий отправлен", show_alert=True)
+            await callback.answer("Комментарий отправлен!")
 
