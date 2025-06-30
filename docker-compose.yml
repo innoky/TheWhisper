@@ -12,8 +12,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
       TZ: Europe/Moscow  # Указываем временную зону
       PGTZ: Europe/Moscow 
-    ports:
-      - "5432:5432"
+    
     networks:
       - app-network
 

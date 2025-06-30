@@ -102,7 +102,7 @@ def register_market_handlers(dp: Dispatcher):
             pseudo_name = result.get('pseudo_name', 'Unknown')
             price = result.get('price', 0)
             new_balance = result.get('new_balance', 0)
-            await callback.answer(f"✅ Никнейм '{pseudo_name}' куплен за {price} т.! Новый баланс: {new_balance} т.", show_alert=True)
+            await callback.answer(f"✅ Никнейм '{pseudo_name}' куплен за {price} т.! Новый баланс: {new_balance} т.")
             
             # Обновить клавиатуру: убрать купленный ник
             pseudos = await get_all_pseudo_names()
@@ -149,7 +149,7 @@ def register_market_handlers(dp: Dispatcher):
                     await callback.answer("✅ Никнейм куплен! Обновите список командой /market")
                 
         elif 'non_field_errors' in result and 'unique' in str(result['non_field_errors']):
-            await callback.answer("❌ Вы уже купили этот ник!", show_alert=True)
+            await callback.answer("❌ Вы уже купили этот ник!")
             # Обновляем клавиатуру, убирая купленный ник
             pseudos = await get_all_pseudo_names()
             
@@ -185,4 +185,4 @@ def register_market_handlers(dp: Dispatcher):
             error_msg = result.get('error', str(result)) if result else "Неизвестная ошибка"
             if len(error_msg) > 200:
                 error_msg = error_msg[:200] + "..."
-            await callback.answer(f"Ошибка: {error_msg}", show_alert=True) 
+            await callback.answer(f"Ошибка: {error_msg}") 

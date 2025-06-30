@@ -74,7 +74,7 @@ def register_admin_handlers(dp: Dispatcher):
             ban_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
             ban_message += f"👮 <b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
         
-        await callback.answer(ban_message, show_alert=True)
+        await callback.answer("Пользователь забанен!", show_alert=True)
     
     @dp.message(Command("unban"))
     async def unban_handler(message: types.Message):
@@ -132,7 +132,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"<b>Ошибка:</b> {user_info['error']}")
+            await message.answer(f"<b>Ошибка:</b> {user_info['error']}", parse_mode='HTML')
             return
         
         current_level = int(user_info.get('level', 1))
@@ -145,10 +145,10 @@ def register_admin_handlers(dp: Dispatcher):
         # Устанавливаем новый уровень
         result = await set_user_level(user_id, new_level)
         if 'error' in result:
-            await message.answer(f"❌ Ошибка при повышении уровня: {result['error']}")
+            await message.answer(f"❌ Ошибка при повышении уровня: {result['error']}", parse_mode='HTML')
             return
         
-        await message.answer(f"<b>Уровень пользователя {user_id} повышен с {current_level} до {new_level}</b>")
+        await message.answer(f"<b>Уровень пользователя {user_id} повышен с {current_level} до {new_level}</b>", parse_mode='HTML')
         
         # Отправляем уведомление пользователю
         try:
@@ -183,7 +183,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"<b>Ошибка:</b> {user_info['error']}")
+            await message.answer(f"<b>Ошибка:</b> {user_info['error']}", parse_mode='HTML')
             return
         
         current_level = int(user_info.get('level', 1))
@@ -196,10 +196,10 @@ def register_admin_handlers(dp: Dispatcher):
         # Устанавливаем новый уровень
         result = await set_user_level(user_id, new_level)
         if 'error' in result:
-            await message.answer(f"❌ Ошибка при понижении уровня: {result['error']}")
+            await message.answer(f"❌ Ошибка при понижении уровня: {result['error']}", parse_mode='HTML')
             return
         
-        await message.answer(f"<b>Уровень пользователя {user_id} понижен с {current_level} до {new_level}</b>")
+        await message.answer(f"<b>Уровень пользователя {user_id} понижен с {current_level} до {new_level}</b>", parse_mode='HTML')
         
         # Отправляем уведомление пользователю
         try:
@@ -218,12 +218,12 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("addpseudo"))
     async def addpseudo_handler(message: types.Message):
         if not message.text:
-            await message.answer('Использование: /addpseudo "Никнейм" цена\nПример: /addpseudo "Ядерный шепот" 150')
+            await message.answer('Использование: /addpseudo "Никнейм" цена\nПример: /addpseudo "Ядерный шепот" 150', parse_mode='HTML')
             return
         pattern = r'^/addpseudo\s+"([^"]+)"\s+(\d+(?:\.\d+)?)'
         match = re.match(pattern, message.text)
         if not match:
-            await message.answer('Использование: /addpseudo "Никнейм" цена\nПример: /addpseudo "Ядерный шепот" 150')
+            await message.answer('Использование: /addpseudo "Никнейм" цена\nПример: /addpseudo "Ядерный шепот" 150', parse_mode='HTML')
             return
         nickname = match.group(1)
         price = float(match.group(2))
@@ -254,20 +254,20 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("addbalance"))
     async def addbalance_handler(message: types.Message):
         if not message.text:
-            await message.answer('Использование: /addbalance user_id сумма')
+            await message.answer('Использование: /addbalance user_id сумма', parse_mode='HTML')
             return
         parts = message.text.split()
         if len(parts) < 3:
-            await message.answer('Использование: /addbalance user_id сумма')
+            await message.answer('Использование: /addbalance user_id сумма', parse_mode='HTML')
             return
         user_id, amount = parts[1], parts[2]
         if not user_id.isdigit():
-            await message.answer('user_id должен быть числом')
+            await message.answer('user_id должен быть числом', parse_mode='HTML')
             return
         try:
             amount = float(amount)
         except ValueError:
-            await message.answer('Сумма должна быть числом')
+            await message.answer('Сумма должна быть числом', parse_mode='HTML')
             return
         
         user_id = int(user_id)
@@ -275,7 +275,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}')
+            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}', parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -304,20 +304,20 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("setbalance"))
     async def setbalance_handler(message: types.Message):
         if not message.text:
-            await message.answer('Использование: /setbalance user_id сумма')
+            await message.answer('Использование: /setbalance user_id сумма', parse_mode='HTML')
             return
         parts = message.text.split()
         if len(parts) < 3:
-            await message.answer('Использование: /setbalance user_id сумма')
+            await message.answer('Использование: /setbalance user_id сумма', parse_mode='HTML')
             return
         user_id, amount = parts[1], parts[2]
         if not user_id.isdigit():
-            await message.answer('user_id должен быть числом')
+            await message.answer('user_id должен быть числом', parse_mode='HTML')
             return
         try:
             amount = float(amount)
         except ValueError:
-            await message.answer('Сумма должна быть числом')
+            await message.answer('Сумма должна быть числом', parse_mode='HTML')
             return
         
         user_id = int(user_id)
@@ -325,7 +325,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}')
+            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}', parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -353,7 +353,7 @@ def register_admin_handlers(dp: Dispatcher):
     async def allpseudos_handler(message: types.Message):
         pseudos = await get_all_pseudo_names()
         if isinstance(pseudos, dict) and pseudos.get("error"):
-            await message.answer(f'<b>Ошибка:</b> {pseudos}')
+            await message.answer(f'<b>Ошибка:</b> {pseudos}', parse_mode='HTML')
             return
         if not pseudos:
             await message.answer('<b>Нет псевдонимов в системе</b>', parse_mode='HTML')
@@ -401,11 +401,11 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("deactivate"))
     async def deactivate_handler(message: types.Message):
         if not message.text:
-            await message.answer('Использование: /deactivate pseudo_id')
+            await message.answer('Использование: /deactivate pseudo_id', parse_mode='HTML')
             return
         parts = message.text.split()
         if len(parts) < 2 or not parts[1].isdigit():
-            await message.answer('Использование: /deactivate pseudo_id')
+            await message.answer('Использование: /deactivate pseudo_id', parse_mode='HTML')
             return
         pseudo_id = int(parts[1])
         
@@ -651,7 +651,7 @@ def register_admin_handlers(dp: Dispatcher):
             return
         queue_info = await get_queue_info()
         if 'error' in queue_info:
-            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}")
+            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}", parse_mode='HTML')
             return
         posts = queue_info.get('results', [])
         if not posts:
@@ -670,14 +670,14 @@ def register_admin_handlers(dp: Dispatcher):
         try:
             result = await recalculate_queue_after_immediate_publication()
             if 'error' in result:
-                await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}")
+                await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}", parse_mode='HTML')
                 return
             updated_count = result.get('updated_count', 0)
             status_message = result.get('message', 'Пересчет завершен')
             if updated_count == 0:
-                await message.answer("<b>Очередь пуста — нечего пересчитывать</b>")
+                await message.answer("<b>Очередь пуста — нечего пересчитывать</b>", parse_mode='HTML')
             else:
-                await message.answer(f"<b>{status_message}</b>\n\n<b>Пересчитано постов:</b> {updated_count}")
+                await message.answer(f"<b>{status_message}</b>\n\n<b>Пересчитано постов:</b> {updated_count}", parse_mode='HTML')
                 queue_info = await get_queue_info()
                 if 'error' not in queue_info:
                     posts = queue_info.get('results', [])
@@ -686,7 +686,7 @@ def register_admin_handlers(dp: Dispatcher):
                         await message.answer(queue_message, parse_mode="HTML")
         except Exception as e:
             logging.exception(f"[queueupdate_handler] Exception: {e}")
-            await message.answer(f"❌ Произошла ошибка при пересчете очереди: {str(e)}")
+            await message.answer(f"❌ Произошла ошибка при пересчете очереди: {str(e)}", parse_mode='HTML')
 
     @dp.message(Command("makeadmin"))
     async def makeadmin_handler(message: types.Message):
@@ -712,7 +712,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"❌ Ошибка: {user_info['error']}")
+            await message.answer(f"❌ Ошибка: {user_info['error']}", parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -736,7 +736,7 @@ def register_admin_handlers(dp: Dispatcher):
                         )
                     else:
                         error_text = await response.text()
-                        await message.answer(f"❌ Ошибка установки прав: {response.status} - {error_text}")
+                        await message.answer(f"❌ Ошибка установки прав: {response.status} - {error_text}", parse_mode='HTML')
         except Exception as e:
             logging.error(f"[makeadmin_handler] Exception: {e}")
-            await message.answer(f"❌ Произошла ошибка при установке прав: {str(e)}")
+            await message.answer(f"❌ Произошла ошибка при установке прав: {str(e)}", parse_mode='HTML')
