@@ -568,49 +568,24 @@ def register_admin_handlers(dp: Dispatcher):
             )
         await message.answer(reply, parse_mode="HTML")
 
-    @dp.message(Command("queue"))
-    async def queue_handler(message: types.Message):
-        """Показывает подробную информацию о всех постах в очереди"""
-        if not await is_admin(message.from_user.id):
-            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
-            return
-        
-        queue_info = await get_queue_info()
-        
-        if 'error' in queue_info:
-            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}")
-            return
-        
-        posts = queue_info.get('results', [])
+    def format_queue_message(posts, title="Очередь постов"):
         count = len(posts)
-        
-        if count == 0:
-            await message.answer("<b>📋 Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
-            return
-        
-        # Формируем сообщение с подробной информацией о постах
-        queue_message = f"<b>📋 Очередь постов</b>\n\n"
+        queue_message = f"<b>📋 {title}</b>\n\n"
         queue_message += f"<b>Всего в очереди:</b> {count} постов\n"
         queue_message += f"<b>Время запроса:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-        
         for i, post in enumerate(posts, 1):
             author_id = post.get('author', 'N/A')
             content = post.get('content', '')
             posted_at_str = post.get('posted_at', 'N/A')
             post_id = post.get('id', 'N/A')
             telegram_id = post.get('telegram_id', 'N/A')
-            
-            # Парсим время публикации и рассчитываем время до публикации
             try:
                 if posted_at_str and ('+' in posted_at_str or 'Z' in posted_at_str):
                     posted_dt = datetime.strptime(posted_at_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
                     posted_dt = posted_dt.astimezone(timezone(timedelta(hours=3)))
                     formatted_time = posted_dt.strftime('%d.%m.%Y в %H:%M')
-                    
-                    # Рассчитываем время до публикации
                     now = datetime.now(timezone(timedelta(hours=3)))
                     time_diff = (posted_dt - now).total_seconds()
-                    
                     if time_diff > 0:
                         hours = int(time_diff // 3600)
                         minutes = int((time_diff % 3600) // 60)
@@ -630,12 +605,9 @@ def register_admin_handlers(dp: Dispatcher):
                 formatted_time = posted_at_str
                 time_until = "ошибка парсинга"
                 status_emoji = "❌"
-            
-            # Обрезаем контент для отображения
             content_preview = content[:80] + '...' if len(content) > 80 else content
             if not content_preview.strip():
                 content_preview = "<i>Контент не найден</i>"
-            
             queue_message += f"<b>{i}.</b> {status_emoji} <b>Пост #{post_id}</b>\n"
             queue_message += f"👤 <b>Автор:</b> {author_id}\n"
             queue_message += f"📝 <b>Контент:</b> {content_preview}\n"
@@ -643,8 +615,7 @@ def register_admin_handlers(dp: Dispatcher):
             queue_message += f"🕐 <b>Статус:</b> {time_until}\n"
             queue_message += f"🆔 <b>Telegram ID:</b> {telegram_id}\n"
             queue_message += f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        
-        # Добавляем информацию о следующем посте
+        # Информация о следующем посте
         if posts:
             first_post = posts[0]
             first_post_time = first_post.get('posted_at')
@@ -655,7 +626,6 @@ def register_admin_handlers(dp: Dispatcher):
                         first_dt = first_dt.astimezone(timezone(timedelta(hours=3)))
                         now = datetime.now(timezone(timedelta(hours=3)))
                         time_to_first = (first_dt - now).total_seconds()
-                        
                         if time_to_first > 0:
                             hours = int(time_to_first // 3600)
                             minutes = int((time_to_first % 3600) // 60)
@@ -665,14 +635,29 @@ def register_admin_handlers(dp: Dispatcher):
                                 next_post_info = f"через {minutes}м"
                         else:
                             next_post_info = "готов к публикации"
-                        
                         queue_message += f"<b>📊 Информация:</b>\n"
                         queue_message += f"• Следующий пост: {next_post_info}\n"
                         queue_message += f"• Интервал между постами: {POST_INTERVAL_MINUTES} минут\n"
                         queue_message += f"• Неактивное время: 01:00-10:00 (посты переносятся на 10:00)\n"
                 except:
                     pass
-        
+        return queue_message
+
+    @dp.message(Command("queue"))
+    async def queue_handler(message: types.Message):
+        """Показывает подробную информацию о всех постах в очереди"""
+        if not await is_admin(message.from_user.id):
+            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
+            return
+        queue_info = await get_queue_info()
+        if 'error' in queue_info:
+            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}")
+            return
+        posts = queue_info.get('results', [])
+        if not posts:
+            await message.answer("<b>📋 Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
+            return
+        queue_message = format_queue_message(posts, title="Очередь постов")
         await message.answer(queue_message, parse_mode="HTML")
 
     @dp.message(Command("queueupdate"))
@@ -681,59 +666,24 @@ def register_admin_handlers(dp: Dispatcher):
         if not await is_admin(message.from_user.id):
             await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
             return
-        
         await message.answer("<b>Начинаю пересчет очереди...</b>")
-        
         try:
-            # Выполняем пересчет очереди
             result = await recalculate_queue_after_immediate_publication()
-            
             if 'error' in result:
                 await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}")
                 return
-            
             updated_count = result.get('updated_count', 0)
             status_message = result.get('message', 'Пересчет завершен')
-            
             if updated_count == 0:
                 await message.answer("<b>Очередь пуста — нечего пересчитывать</b>")
             else:
                 await message.answer(f"<b>{status_message}</b>\n\n<b>Пересчитано постов:</b> {updated_count}")
-                
-                # Показываем обновленную очередь
                 queue_info = await get_queue_info()
                 if 'error' not in queue_info:
-                    posts = queue_info.get('posts', [])
-                    count = queue_info.get('count', 0)
-                    
-                    if count > 0:
-                        queue_message = f"<b>Обновленная очередь постов</b>\n\n"
-                        queue_message += f"<b>Всего в очереди:</b> {count} постов\n\n"
-                        
-                        for i, post in enumerate(posts, 1):
-                            author_id = post.get('author', 'N/A')
-                            content = post.get('content', '')[:50] + '...' if len(post.get('content', '')) > 50 else post.get('content', '')
-                            posted_at_str = post.get('posted_at', 'N/A')
-                            post_id = post.get('id', 'N/A')
-                            
-                            # Парсим время публикации
-                            try:
-                                if posted_at_str and ('+' in posted_at_str or 'Z' in posted_at_str):
-                                    posted_dt = datetime.strptime(posted_at_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                                    posted_dt = posted_dt.astimezone(timezone(timedelta(hours=3)))
-                                    formatted_time = posted_dt.strftime('%d.%m.%Y в %H:%M')
-                                else:
-                                    formatted_time = posted_at_str
-                            except:
-                                formatted_time = posted_at_str
-                            
-                            queue_message += f"<b>{i}.</b> 👤 <b>Автор:</b> {author_id}\n"
-                            queue_message += f"📝 <b>Контент:</b> {content}\n"
-                            queue_message += f"⏰ <b>Время публикации:</b> {formatted_time}\n"
-                            queue_message += f"🆔 <b>ID поста:</b> {post_id}\n\n"
-                        
+                    posts = queue_info.get('results', [])
+                    if posts:
+                        queue_message = format_queue_message(posts, title="Обновленная очередь постов")
                         await message.answer(queue_message, parse_mode="HTML")
-                
         except Exception as e:
             logging.exception(f"[queueupdate_handler] Exception: {e}")
             await message.answer(f"❌ Произошла ошибка при пересчете очереди: {str(e)}")
