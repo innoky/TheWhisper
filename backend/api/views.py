@@ -274,12 +274,15 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Добавляем фильтрацию по telegram_id
+        Добавляем фильтрацию по telegram_id и post (reply_to)
         """
         queryset = Comment.objects.all().order_by('-created_at')
         telegram_id = self.request.query_params.get('telegram_id', None)
+        post_id = self.request.query_params.get('post', None)
         if telegram_id is not None:
             queryset = queryset.filter(telegram_id=telegram_id)
+        if post_id is not None:
+            queryset = queryset.filter(reply_to=post_id)
         return queryset
 
     @action(detail=False, methods=['get'], url_path='telegram/(?P<telegram_id>[^/.]+)')
