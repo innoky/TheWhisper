@@ -8,6 +8,7 @@ import os
 import pytz
 
 API_BASE = 'http://backend:8000/api/'
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 
 async def try_create_user(user_id, username, firstname, lastname) -> dict:
     """
@@ -422,7 +423,7 @@ async def add_balance(user_id: int, amount: float) -> dict:
     """
     Добавляет указанную сумму к балансу пользователя.
     """
-    headers = {'Content-Type': 'application/json'}
+    headers = {'Content-Type': 'application/json', 'X-ACCESS-TOKEN': ACCESS_TOKEN}
     payload = {
         "amount": amount
     }
@@ -439,7 +440,7 @@ async def set_balance(user_id: int, amount: float) -> dict:
     """
     Устанавливает баланс пользователя на указанную сумму.
     """
-    headers = {'Content-Type': 'application/json'}
+    headers = {'Content-Type': 'application/json', 'X-ACCESS-TOKEN': ACCESS_TOKEN}
     payload = {
         "amount": amount
     }
@@ -1346,9 +1347,10 @@ async def create_promo_code(code: str, reward_amount: float, description: str = 
         "is_active": True
     }
     
-    if expires_at:
+    # Удаляем ключи, если значения None
+    if expires_at is not None:
         payload["expires_at"] = expires_at
-    if created_by:
+    if created_by is not None:
         payload["created_by"] = created_by
     
     API_URL = API_BASE + 'promo-codes/'
@@ -1362,3 +1364,27 @@ async def create_promo_code(code: str, reward_amount: float, description: str = 
     except Exception as e:
         logging.exception("Error in create_promo_code")
         return {"error": f"Request failed: {str(e)}"}
+
+async def get_comments_for_post(post_id: int) -> list:
+    """
+    Получает все комментарии к посту по его ID.
+    Возвращает список комментариев (или пустой список).
+    """
+    headers = {'Accept': 'application/json'}
+    API_URL = API_BASE + f'comments/?post={post_id}&page_size=1000'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, dict) and 'results' in data:
+                        return data['results']
+                    elif isinstance(data, list):
+                        return data
+                    else:
+                        return []
+                else:
+                    return []
+    except Exception as e:
+        logging.exception("Error in get_comments_for_post")
+        return []

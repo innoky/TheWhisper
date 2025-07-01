@@ -28,6 +28,11 @@ def get_channel_id_for_link():
         return CHAT_ID[4:]  # Убираем префикс -100
     return CHAT_ID
 
+def format_username(username):
+    if not username or str(username).lower() == 'none':
+        return 'N/A'
+    return username
+
 class CommentState(StatesGroup):
     waiting_for_comment = State()
     waiting_for_nick = State()
@@ -108,7 +113,7 @@ def register_comment_handlers(dp: Dispatcher):
                 raise ValueError("ADMIN_CHAT_ID не установлен")
             await message.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[GIF]",
+                text=f"От: @{format_username(message.from_user.username)}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[GIF]",
                 reply_markup=ban_keyboard,
                 parse_mode=ParseMode.HTML
             )
@@ -184,7 +189,7 @@ def register_comment_handlers(dp: Dispatcher):
                 raise ValueError("ADMIN_CHAT_ID не установлен")
             await message.bot.send_message(
                 chat_id=ADMIN_CHAT_ID,
-                text=f"От: @{message.from_user.username}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[STICKER]",
+                text=f"От: @{format_username(message.from_user.username)}, {message.from_user.id}, {message.from_user.first_name}, {message.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n[STICKER]",
                 reply_markup=ban_keyboard,
                 parse_mode=ParseMode.HTML
             )
@@ -316,7 +321,7 @@ def register_comment_handlers(dp: Dispatcher):
                 )
                 await callback.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{comment_text}",
+                    text=f"От: @{format_username(callback.from_user.username)}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{comment_text}",
                     reply_markup=ban_keyboard,
                     parse_mode=ParseMode.HTML
                 )
@@ -389,7 +394,7 @@ def register_comment_handlers(dp: Dispatcher):
                 )
                 await callback.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
-                    text=f"От: @{callback.from_user.username}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{caption}",
+                    text=f"От: @{format_username(callback.from_user.username)}, {callback.from_user.id}, {callback.from_user.first_name}, {callback.from_user.last_name}\nК посту: t.me/c/{get_channel_id_for_link()}/{target_message_id}\n\n{caption}",
                     reply_markup=ban_keyboard,
                     parse_mode=ParseMode.HTML
                 )
