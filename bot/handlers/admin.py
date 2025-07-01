@@ -2,7 +2,7 @@ from aiogram import types, F, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
-from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication, get_user_pseudo_names_full
+from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication, get_user_pseudo_names_full, get_comments_count, get_comments_for_user_posts
 import re
 from aiogram.methods import EditMessageReplyMarkup
 import aiohttp
@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 import os
 import difflib
 from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
+from collections import Counter
 
 # Импортируем константы из suggest
 POST_INTERVAL_MINUTES = 30
@@ -529,6 +530,43 @@ def register_admin_handlers(dp: Dispatcher):
             for i, p in enumerate(top_posts, 1):
                 frag = p.get('content','')[:60].replace('\n',' ')
                 top_posts_str += f"{i}. {frag}{'...' if len(p.get('content',''))>60 else ''} ({len(p.get('content',''))} симв.)\n"
+        # --- Интересные факты о комментариях ---
+        from db.wapi import get_comments_for_user_posts
+        comments = await get_comments_for_user_posts(user_id)
+        comments_count = len(comments)
+        # Топ-комментатор (по количеству комментариев)
+        from collections import Counter
+        author_counter = Counter(c.get('author') for c in comments if c.get('author'))
+        top_commenter_id, top_commenter_count = (author_counter.most_common(1)[0] if author_counter else (None, 0))
+        # Самый обсуждаемый пост
+        post_counter = Counter(c.get('reply_to') for c in comments if c.get('reply_to'))
+        most_discussed_post_id, most_discussed_count = (post_counter.most_common(1)[0] if post_counter else (None, 0))
+        # Среднее число комментариев на пост
+        avg_comments = round(comments_count / total, 2) if total > 0 else 0
+        # --- Синтаксический анализ: топ-слова пользователя ---
+        import re
+        from collections import Counter
+        stopwords = set([
+            'и', 'в', 'во', 'не', 'что', 'он', 'на', 'я', 'с', 'со', 'как', 'а', 'то', 'все', 'она', 'так', 'его',
+            'но', 'да', 'ты', 'к', 'у', 'же', 'вы', 'за', 'бы', 'по', 'только', 'ее', 'мне', 'было', 'вот', 'от',
+            'меня', 'еще', 'нет', 'о', 'из', 'ему', 'теперь', 'когда', 'даже', 'ну', 'вдруг', 'ли', 'если', 'уже',
+            'или', 'ни', 'быть', 'был', 'него', 'до', 'вас', 'нибудь', 'опять', 'уж', 'вам', 'ведь', 'там', 'потом',
+            'себя', 'ничего', 'ей', 'может', 'они', 'тут', 'где', 'есть', 'надо', 'ней', 'для', 'мы', 'тебя', 'их',
+            'чем', 'была', 'сам', 'чтоб', 'без', 'будто', 'чего', 'раз', 'тоже', 'себе', 'под', 'будет', 'ж', 'тогда',
+            'кто', 'этот', 'того', 'потому', 'этого', 'какой', 'совсем', 'ним', 'здесь', 'этом', 'один', 'почти',
+            'мой', 'тем', 'чтобы', 'нее', 'сейчас', 'были', 'куда', 'зачем', 'всех', 'никогда', 'можно', 'при',
+            'наконец', 'два', 'об', 'другой', 'хоть', 'после', 'над', 'больше', 'тот', 'через', 'эти', 'нас', 'про',
+            'всего', 'них', 'какая', 'много', 'разве', 'три', 'эту', 'моя', 'впрочем', 'хорошо', 'свою', 'этой',
+            'перед', 'иногда', 'лучше', 'чуть', 'том', 'нельзя', 'такой', 'им', 'более', 'всегда', 'конечно',
+            'всю', 'между'
+        ])
+        all_text = ' '.join(p.get('content', '') for p in posts if p.get('content'))
+        all_text = re.sub(r'https?://\S+', '', all_text)
+        all_text = re.sub(r'[^а-яА-Яa-zA-ZёЁ\s]', ' ', all_text)
+        all_text = all_text.lower()
+        words = [w for w in all_text.split() if len(w) > 3 and w not in stopwords]
+        word_counter = Counter(words)
+        top_words = word_counter.most_common(10)
         # Формируем красивый вывод
         stats_message = f"<b>Статистика {user_info.get('firstname','') or ''} {user_info.get('lastname','') or ''}</b>\n"
         stats_message += f"@{user_info.get('username','N/A')}\n"
@@ -545,278 +583,20 @@ def register_admin_handlers(dp: Dispatcher):
         stats_message += f"<b>💰 Баланс:</b> {user_info.get('balance','N/A')} т.\n"
         stats_message += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
         stats_message += f"\n"
+        stats_message += f"<b>💬 Комментарии к вашим постам:</b> {comments_count}\n"
+        if top_commenter_id:
+            stats_message += f"<b>👤 Топ-комментатор:</b> <code>{top_commenter_id}</code> ({top_commenter_count} комм.)\n"
+        if most_discussed_post_id:
+            stats_message += f"<b>🔥 Самый обсуждаемый пост:</b> #{most_discussed_post_id} ({most_discussed_count} комм.)\n"
+        stats_message += f"<b>📊 Среднее комментариев на пост:</b> {avg_comments}\n"
         if top_posts_str:
             stats_message += top_posts_str + '\n'
         if first_post_str:
             stats_message += f"<b>Первая работа</b>\n{first_post_str}\n"
+        if top_words:
+            stats_message += '\n<b>📝 Топ-слова ваших постов:</b>\n'
+            stats_message += ', '.join(f'{w} ({c})' for w, c in top_words)
+            stats_message += '\n'
         stats_message += f"<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
         await message.answer(stats_message, parse_mode="HTML")
 
-    @dp.message(Command("getuser"))
-    async def getuser_handler(message: types.Message):
-        if not message.text:
-            await message.answer("Использование: /getuser <username или ID>")
-            return
-        parts = message.text.split(maxsplit=1)
-        if len(parts) < 2:
-            await message.answer("Использование: /getuser <username или ID>")
-            return
-        query = parts[1].strip().lstrip('@')
-        if not query:
-            await message.answer("Введите ник, часть ника или ID пользователя")
-            return
-        
-        # Сначала проверяем, не является ли запрос числовым ID
-        if query.isdigit():
-            user_id = int(query)
-            user_info = await get_user_info(user_id)
-            if 'error' not in user_info:
-                user = user_info
-                reply = "<b>Пользователь найден по ID:</b>\n\n"
-                reply += (
-                    f"ID: <code>{user['id']}</code>\n"
-                    f"Username: @{format_username(user.get('username'))}\n"
-                    f"Имя: {user.get('firstname', '')} {user.get('lastname', '')}\n"
-                    f"Баланс: {user.get('balance', 'N/A')}\n"
-                    f"Уровень: {user.get('level', 'N/A')}\n"
-                    f"Админ: {'Да' if user.get('is_admin') else 'Нет'}\n"
-                    f"Бан: {'Да' if user.get('is_banned') else 'Нет'}\n"
-                )
-                await message.answer(reply, parse_mode="HTML")
-                return
-            else:
-                await message.answer(f"Пользователь с ID {user_id} не найден")
-                return
-        
-        # Если не ID, ищем по username и имени
-        users = await get_all_users()
-        if not users:
-            await message.answer("Не удалось получить список пользователей.")
-            return
-        # Составляем список username и firstname/lastname
-        candidates = []
-        for u in users:
-            uname = (u.get('username') or '').lower()
-            fname = (u.get('firstname') or '').lower()
-            lname = (u.get('lastname') or '').lower()
-            full = f"{fname} {lname}".strip()
-            candidates.append((u, uname, full))
-        # Считаем похожесть
-        scored = []
-        for u, uname, full in candidates:
-            score = max(
-                difflib.SequenceMatcher(None, query.lower(), uname).ratio(),
-                difflib.SequenceMatcher(None, query.lower(), full).ratio()
-            )
-            scored.append((score, u))
-        scored.sort(reverse=True, key=lambda x: x[0])
-        top = [u for score, u in scored if score > 0.3][:5]
-        if not top:
-            await message.answer("Пользователь не найден. Попробуйте другую часть ника или ID пользователя.")
-            return
-        reply = "<b>Похожие пользователи:</b>\n\n"
-        for u in top:
-            reply += (
-                f"ID: <code>{u['id']}</code>\n"
-                f"Username: @{format_username(u.get('username'))}\n"
-                f"Имя: {u.get('firstname', '')} {u.get('lastname', '')}\n"
-                f"Баланс: {u.get('balance', 'N/A')}\n"
-                f"Уровень: {u.get('level', 'N/A')}\n"
-                f"Админ: {'Да' if u.get('is_admin') else 'Нет'}\n"
-                f"Бан: {'Да' if u.get('is_banned') else 'Нет'}\n"
-                "----------------------\n"
-            )
-        await message.answer(reply, parse_mode="HTML")
-
-    def format_queue_message(posts, title="Очередь постов"):
-        import os
-        from aiogram.utils.formatting import TextLink
-        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
-        if offers_chat_id and offers_chat_id.startswith('-100'):
-            offers_chat_id_link = offers_chat_id[4:]
-        else:
-            offers_chat_id_link = offers_chat_id or ''
-        content = []
-        content.append(Bold(f"📋 {title}\n"))
-        content.append(Text("\n"))
-        content.append(Text(f"Всего в очереди: {len(posts)} постов\n"))
-        content.append(Text(f"Время запроса: {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"))
-        content.append(Text("\n"))
-        for i, post in enumerate(posts, 1):
-            author_id = post.get('author', 'N/A')
-            content_text = post.get('content', '')
-            posted_at_str = post.get('posted_at', 'N/A')
-            post_id = post.get('id', 'N/A')
-            telegram_id = post.get('telegram_id', 'N/A')
-            try:
-                if posted_at_str and ('+' in posted_at_str or 'Z' in posted_at_str):
-                    posted_dt = datetime.strptime(posted_at_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                    posted_dt = posted_dt.astimezone(timezone(timedelta(hours=3)))
-                    formatted_time = posted_dt.strftime('%d.%m.%Y в %H:%M')
-                    now = datetime.now(timezone(timedelta(hours=3)))
-                    time_diff = (posted_dt - now).total_seconds()
-                    if time_diff > 0:
-                        hours = int(time_diff // 3600)
-                        minutes = int((time_diff % 3600) // 60)
-                        if hours > 0:
-                            time_until = f"через {hours}ч {minutes}м"
-                        else:
-                            time_until = f"через {minutes}м"
-                        status_emoji = "⏳"
-                    else:
-                        time_until = "готов к публикации"
-                        status_emoji = "✅"
-                else:
-                    formatted_time = posted_at_str
-                    time_until = "неизвестно"
-                    status_emoji = "❓"
-            except Exception as e:
-                formatted_time = posted_at_str
-                time_until = "ошибка парсинга"
-                status_emoji = "❌"
-            content_preview = content_text[:80] + '...' if len(content_text) > 80 else content_text
-            if not content_preview.strip():
-                content_preview = Italic("Контент не найден")
-            else:
-                content_preview = Text(content_preview)
-            content.append(Bold(f"{i}. {status_emoji} Пост #{post_id}\n"))
-            content.append(Text(f"👤 Автор: {author_id}\n"))
-            content.append(Text("📝 Контент: ") + content_preview + Text("\n"))
-            content.append(Text(f"⏰ Время публикации: {formatted_time}\n"))
-            content.append(Text(f"🕐 Статус: {time_until}\n"))
-            # Формируем ссылку на сообщение по telegram_id
-            if offers_chat_id_link and telegram_id != 'N/A':
-                msg_link = f"https://t.me/c/{offers_chat_id_link}/{telegram_id}"
-                content.append(Text("🆔 Telegram ID: ") + TextLink(str(telegram_id), url=msg_link) + Text("\n"))
-            else:
-                content.append(Text(f"🆔 Telegram ID: {telegram_id}\n"))
-            content.append(Text("━━━━━━━━━━━━━━━━━━━━\n"))
-            content.append(Text("\n"))  # Пустая строка между постами
-        # Информация о следующем посте
-        if posts:
-            first_post = posts[0]
-            first_post_time = first_post.get('posted_at')
-            if first_post_time:
-                try:
-                    if '+' in first_post_time or 'Z' in first_post_time:
-                        first_dt = datetime.strptime(first_post_time.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                        first_dt = first_dt.astimezone(timezone(timedelta(hours=3)))
-                        now = datetime.now(timezone(timedelta(hours=3)))
-                        time_to_first = (first_dt - now).total_seconds()
-                        if time_to_first > 0:
-                            hours = int(time_to_first // 3600)
-                            minutes = int((time_to_first % 3600) // 60)
-                            if hours > 0:
-                                next_post_info = f"через {hours}ч {minutes}м"
-                            else:
-                                next_post_info = f"через {minutes}м"
-                        else:
-                            next_post_info = "готов к публикации"
-                        content.append(Bold("📊 Информация:\n"))
-                        content.append(Text(f"• Следующий пост: {next_post_info}\n"))
-                        content.append(Text(f"• Интервал между постами: {POST_INTERVAL_MINUTES} минут\n"))
-                        content.append(Text(f"• Неактивное время: 01:00-10:00 (посты переносятся на 10:00)\n"))
-                        content.append(Text("\n"))
-                except:
-                    pass
-        return ExpandableBlockQuote(*content)
-
-    @dp.message(Command("queue"))
-    async def queue_handler(message: types.Message):
-        """Показывает подробную информацию о всех постах в очереди"""
-        if not await is_admin(message.from_user.id):
-            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
-            return
-        queue_info = await get_queue_info()
-        if 'error' in queue_info:
-            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}", parse_mode='HTML')
-            return
-        posts = queue_info.get('results', [])
-        if not posts:
-            await message.answer("<b>📋 Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
-            return
-        queue_message = format_queue_message(posts, title="Очередь постов")
-        await message.answer(**queue_message.as_kwargs())
-
-    @dp.message(Command("queueupdate"))
-    async def queueupdate_handler(message: types.Message):
-        """Принудительно пересчитывает все времена для постов в очереди"""
-        if not await is_admin(message.from_user.id):
-            await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
-            return
-        try:
-            result = await recalculate_queue_after_immediate_publication()
-            if 'error' in result:
-                await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}", parse_mode='HTML')
-                return
-            queue_info = await get_queue_info()
-            if 'error' not in queue_info:
-                posts = queue_info.get('results', [])
-                if posts:
-                    queue_message = format_queue_message(posts, title="Обновленная очередь постов")
-                    await message.answer(**queue_message.as_kwargs())
-        except Exception as e:
-            logging.exception(f"[queueupdate_handler] Exception: {e}")
-            await message.answer(f"❌ Произошла ошибка при пересчете очереди: {str(e)}", parse_mode='HTML')
-
-    @dp.message(Command("makeadmin"))
-    async def makeadmin_handler(message: types.Message):
-        """Устанавливает права администратора пользователю (доступно только суперадмину)"""
-        # Проверяем, что команду выполняет суперадмин
-        if message.from_user.id != 914029246:
-            await message.answer("❌ У вас нет прав для выполнения этой команды")
-            return
-        
-        if not message.text:
-            await message.answer("Использование: /makeadmin <user_id>")
-            return
-        parts = message.text.split()
-        if len(parts) < 2:
-            await message.answer("Использование: /makeadmin <user_id>")
-            return
-        user_id = parts[1]
-        if not user_id.isdigit():
-            await message.answer("ID пользователя должен быть числом")
-            return
-        user_id = int(user_id)
-        
-        # Получаем информацию о пользователе
-        user_info = await get_user_info(user_id)
-        if 'error' in user_info:
-            error_text = user_info.get('error', '')
-            if '404' in error_text:
-                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
-            else:
-                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
-            return
-        
-        username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
-        
-        # Устанавливаем права администратора через API
-        headers = {'Content-Type': 'application/json'}
-        API_URL = f"http://backend:8000/api/users/{user_id}/"
-        update_data = {'is_admin': True}
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(API_URL, headers=headers, json=update_data) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        await message.answer(
-                            f"✅ <b>Права администратора установлены!</b>\n\n"
-                            f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
-                            f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-                            f"👮 <b>Суперадмин:</b> {message.from_user.username or message.from_user.first_name}",
-                            parse_mode="HTML"
-                        )
-                    else:
-                        error_text = await response.text()
-                        await message.answer(f"❌ Ошибка установки прав: {response.status} - {error_text}", parse_mode='HTML')
-        except Exception as e:
-            logging.error(f"[makeadmin_handler] Exception: {e}")
-            await message.answer(f"❌ Произошла ошибка при установке прав: {str(e)}", parse_mode='HTML')
-
-def format_username(username):
-    if not username or str(username).lower() == 'none':
-        return 'N/A'
-    return username
