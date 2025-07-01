@@ -578,7 +578,7 @@ def register_admin_handlers(dp: Dispatcher):
         about_block += "\n"
         # Блок 'Ваши посты'
         posts_block = "<b>Ваши посты:</b>\n"
-        posts_block += f"<b>Всего:</b> {total}\n\n"
+        posts_block += f"<b>Всего:</b> {total}\n"
         posts_block += f"<b>Опубликовано:</b> {posted}\n"
         posts_block += f"<b>Отклонено:</b> {rejected}\n"
         posts_block += f"<b>В очереди:</b> {queued}\n"
