@@ -1431,10 +1431,10 @@ async def get_comments_for_user_posts(user_id: int) -> list:
             # Собираем все комментарии ко всем постам
             all_comments = []
             for post in posts:
-                post_id = post.get('id')
-                if not post_id:
+                telegram_id = post.get('telegram_id')
+                if not telegram_id:
                     continue
-                API_URL_COMMENTS = API_BASE + f'comments/?post={post_id}&page_size=1000'
+                API_URL_COMMENTS = API_BASE + f'comments/?post={telegram_id}&page_size=1000'
                 async with session.get(API_URL_COMMENTS, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
