@@ -2,7 +2,7 @@ from aiogram import types, F, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
-from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication, get_user_pseudo_names_full, get_comments_count, get_comments_for_user_posts
+from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication, get_user_pseudo_names_full, get_comments_count, get_comments_for_user_posts, get_post_info
 import re
 from aiogram.methods import EditMessageReplyMarkup
 import aiohttp
@@ -531,16 +531,19 @@ def register_admin_handlers(dp: Dispatcher):
                 frag = p.get('content','')[:60].replace('\n',' ')
                 top_posts_str += f"{i}. {frag}{'...' if len(p.get('content',''))>60 else ''} ({len(p.get('content',''))} симв.)\n"
         # --- Интересные факты о комментариях ---
-        from db.wapi import get_comments_for_user_posts
         comments = await get_comments_for_user_posts(user_id)
         comments_count = len(comments)
-        # Топ-комментатор (по количеству комментариев)
-        from collections import Counter
-        author_counter = Counter(c.get('author') for c in comments if c.get('author'))
-        top_commenter_id, top_commenter_count = (author_counter.most_common(1)[0] if author_counter else (None, 0))
         # Самый обсуждаемый пост
         post_counter = Counter(c.get('reply_to') for c in comments if c.get('reply_to'))
         most_discussed_post_id, most_discussed_count = (post_counter.most_common(1)[0] if post_counter else (None, 0))
+        channel_post_link = None
+        channel_id = os.getenv("CHANNEL_ID")
+        if most_discussed_post_id and channel_id:
+            post_info = await get_post_info(most_discussed_post_id)
+            channel_message_id = post_info.get('channel_message_id') if isinstance(post_info, dict) else None
+            if channel_message_id:
+                channel_id_clean = channel_id[4:] if channel_id.startswith('-100') else channel_id
+                channel_post_link = f"https://t.me/c/{channel_id_clean}/{channel_message_id}"
         # Среднее число комментариев на пост
         avg_comments = round(comments_count / total, 2) if total > 0 else 0
         # --- Синтаксический анализ: топ-слова пользователя ---
@@ -584,19 +587,20 @@ def register_admin_handlers(dp: Dispatcher):
         stats_message += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
         stats_message += f"\n"
         stats_message += f"<b>💬 Комментарии к вашим постам:</b> {comments_count}\n"
-        if top_commenter_id:
-            stats_message += f"<b>👤 Топ-комментатор:</b> <code>{top_commenter_id}</code> ({top_commenter_count} комм.)\n"
-        if most_discussed_post_id:
-            stats_message += f"<b>🔥 Самый обсуждаемый пост:</b> #{most_discussed_post_id} ({most_discussed_count} комм.)\n"
+        if channel_post_link:
+            stats_message += f"<b>🔥 Самый обсуждаемый пост:</b> <a href=\"{channel_post_link}\">#{most_discussed_post_id}</a> ({most_discussed_count} комм.)\n"
         stats_message += f"<b>📊 Среднее комментариев на пост:</b> {avg_comments}\n"
         if top_posts_str:
-            stats_message += top_posts_str + '\n'
+            stats_message += '\n<b>🏆 Топ-3 самых длинных поста:</b>\n'
+            for i, p in enumerate(top_posts, 1):
+                frag = p.get('content','')[:120].replace('\n',' ')
+                stats_message += f"<blockquote>{i}. {frag}{'...' if len(p.get('content',''))>120 else ''} ({len(p.get('content',''))} симв.)</blockquote>\n"
         if first_post_str:
-            stats_message += f"<b>Первая работа</b>\n{first_post_str}\n"
+            stats_message += f"\n<b>Первая работа</b>\n<blockquote>{first_post_str}</blockquote>\n"
         if top_words:
             stats_message += '\n<b>📝 Топ-слова ваших постов:</b>\n'
             stats_message += ', '.join(f'{w} ({c})' for w, c in top_words)
             stats_message += '\n'
-        stats_message += f"<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
+        stats_message += f"\n<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
         await message.answer(stats_message, parse_mode="HTML")
 
