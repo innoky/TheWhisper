@@ -125,35 +125,31 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Добавляем фильтрацию по telegram_id, is_posted, is_rejected, а также сортировку
+        Добавляем фильтрацию по author, telegram_id, is_posted, is_rejected, а также сортировку
         """
         queryset = Post.objects.all()
+        author = self.request.query_params.get('author', None)
         telegram_id = self.request.query_params.get('telegram_id', None)
         is_posted = self.request.query_params.get('is_posted', None)
         is_rejected = self.request.query_params.get('is_rejected', None)
         ordering = self.request.query_params.get('ordering', '-posted_at')
-        
+
+        if author is not None:
+            queryset = queryset.filter(author=author)
         if telegram_id is not None:
             queryset = queryset.filter(telegram_id=telegram_id)
-        
         if is_posted is not None:
-            # Преобразуем строку в boolean
             if is_posted.lower() == 'true':
                 queryset = queryset.filter(is_posted=True)
             elif is_posted.lower() == 'false':
                 queryset = queryset.filter(is_posted=False)
-        
         if is_rejected is not None:
-            # Преобразуем строку в boolean
             if is_rejected.lower() == 'true':
                 queryset = queryset.filter(is_rejected=True)
             elif is_rejected.lower() == 'false':
                 queryset = queryset.filter(is_rejected=False)
-        
-        # Применяем сортировку
         if ordering:
             queryset = queryset.order_by(ordering)
-        
         return queryset
 
     def partial_update(self, request, *args, **kwargs):
