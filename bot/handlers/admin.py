@@ -564,36 +564,44 @@ def register_admin_handlers(dp: Dispatcher):
         firstname = user_info.get('firstname', '') or ''
         lastname = user_info.get('lastname', '') or ''
         username = user_info.get('username', None)
-        name_line = f"<b>Статистика {firstname}{(' ' + lastname) if lastname and lastname != 'N/A' else ''}</b>\n"
-        stats_message = name_line
+        name_line = f"<b>👤 Статистика: {firstname}{(' ' + lastname) if lastname and lastname != 'N/A' else ''}</b>\n"
         if username and username != 'N/A':
-            stats_message += f"@{username}\n"
-        stats_message += f"\n"
+            name_line += f"<i>@{username}</i>\n"
+        name_line += "\n"
+        # Блок 'О вас'
+        about_block = ""
         if reg_dt and days_with_us is not None:
-            stats_message += f"⏱️ Вы с нами с {reg_str}, уже <b>{days_with_us}</b> дней.\n"
-        stats_message += f"\n"
-        stats_message += f"За это время вы успели сделать <b>{total}</b> постов!\n"
-        stats_message += f"<b>✅ Опубликовано:</b> {posted}\n"
-        stats_message += f"<b>❌ Отклонено:</b> {rejected}\n"
-        stats_message += f"<b>🕓 В очереди:</b> {queued}\n"
-        stats_message += f"\n"
-        stats_message += f"<b>🦄 Ваши псевдонимы:</b> {pseudos_str}\n"
-        stats_message += f"<b>💰 Баланс:</b> {user_info.get('balance','N/A')} т.\n"
-        stats_message += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
-        stats_message += f"\n"
-        stats_message += f"<b>💬 Комментарии к вашим постам:</b> {comments_count}\n"
-        stats_message += f"<b>📊 Среднее комментариев на пост:</b> {avg_comments}\n"
+            about_block += f"<b>🗓️ С нами:</b> <u>{days_with_us} дней</u>\n"
+        about_block += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
+        about_block += f"<b>💰 Баланс:</b> {user_info.get('balance','N/A')} т.\n"
+        about_block += f"<b>🦄 Псевдонимы:</b> {pseudos_str}\n"
+        about_block += "\n"
+        # Блок 'Ваши посты'
+        posts_block = "<b>📊 Ваши посты:</b>\n"
+        posts_block += f"<b>• Всего:</b> {total}\n"
+        posts_block += f"<b>✅ Опубликовано:</b> {posted}\n"
+        posts_block += f"<b>❌ Отклонено:</b> {rejected}\n"
+        posts_block += f"<b>🕓 В очереди:</b> {queued}\n"
+        posts_block += "\n"
+        # Топ-3 длинных поста
+        top_block = ""
         if top_posts_str:
-            stats_message += '\n<b>🏆 Топ-3 самых длинных поста:</b>\n'
+            top_block += '<b>🏆 Топ-3 самых длинных поста:</b>\n'
             for i, p in enumerate(top_posts, 1):
                 frag = p.get('content','')[:120].replace('\n',' ')
-                stats_message += f"<blockquote>{i}. {frag}{'...' if len(p.get('content',''))>120 else ''} ({len(p.get('content',''))} симв.)</blockquote>\n"
+                top_block += f"<blockquote>{i}. {frag}{'...' if len(p.get('content',''))>120 else ''} ({len(p.get('content',''))} симв.)</blockquote>\n"
+        # Первая работа
+        first_block = ""
         if first_post_str:
-            stats_message += f"\n<b>Первая работа</b>\n<blockquote>{first_post_str}</blockquote>\n"
+            first_block += f"<b>Первая работа</b>\n<blockquote>{first_post_str}</blockquote>\n"
+        # Топ-слова
+        words_block = ""
         if top_words:
-            stats_message += '\n<b>📝 Топ-слова ваших постов:</b>\n'
-            stats_message += ', '.join(f'{w} ({c})' for w, c in top_words)
-            stats_message += '\n'
-        stats_message += f"\n<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
+            words_block += '<b>📝 Топ-слова ваших постов:</b>\n'
+            words_block += ', '.join(f'{w} ({c})' for w, c in top_words)
+            words_block += '\n'
+        # Финальный вывод
+        stats_message = name_line + about_block + posts_block + top_block + first_block + words_block
+        stats_message += "\n<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
         await message.answer(stats_message, parse_mode="HTML")
 
