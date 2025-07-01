@@ -1388,3 +1388,59 @@ async def get_comments_for_post(post_id: int) -> list:
     except Exception as e:
         logging.exception("Error in get_comments_for_post")
         return []
+
+async def get_comments_count() -> int:
+    """
+    Получает общее количество комментариев в системе через API (использует поле count).
+    """
+    headers = {'Accept': 'application/json'}
+    API_URL = API_BASE + 'comments/?page_size=1'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, dict) and 'count' in data:
+                        return int(data['count'])
+                    elif isinstance(data, list):
+                        return len(data)
+                    else:
+                        return 0
+                else:
+                    return 0
+    except Exception as e:
+        logging.exception("Error in get_comments_count")
+        return 0
+
+async def get_comments_for_user_posts(user_id: int) -> list:
+    """
+    Получает все комментарии ко всем постам пользователя (автора).
+    Возвращает список комментариев.
+    """
+    headers = {'Accept': 'application/json'}
+    # Получаем все посты пользователя (до 1000)
+    API_URL_POSTS = API_BASE + f'posts/?author={user_id}&page_size=1000'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL_POSTS, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    posts = data['results'] if isinstance(data, dict) and 'results' in data else data if isinstance(data, list) else []
+                else:
+                    posts = []
+            # Собираем все комментарии ко всем постам
+            all_comments = []
+            for post in posts:
+                post_id = post.get('id')
+                if not post_id:
+                    continue
+                API_URL_COMMENTS = API_BASE + f'comments/?post={post_id}&page_size=1000'
+                async with session.get(API_URL_COMMENTS, headers=headers) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        comments = data['results'] if isinstance(data, dict) and 'results' in data else data if isinstance(data, list) else []
+                        all_comments.extend(comments)
+            return all_comments
+    except Exception as e:
+        logging.exception("Error in get_comments_for_user_posts")
+        return []
