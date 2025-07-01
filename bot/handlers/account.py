@@ -66,7 +66,7 @@ def register_account_handlers(dp: Dispatcher):
 <b>Основная информация:</b>
 • ID: {user_info.get('id', 'N/A')}
 • Имя: {user_info.get('firstname', 'N/A')} {user_info.get('lastname', 'N/A')}
-• Username: @{user_info.get('username', 'N/A')}
+• Username: @{format_username(user_info.get('username'))}
 • Уровень: {user_info.get('level', 1)}/10
 • Баланс: {user_info.get('balance', 0)} т.
 • Статус: {'Заблокирован' if user_info.get('is_banned', False) else 'Активен'}
@@ -123,4 +123,9 @@ def register_account_handlers(dp: Dispatcher):
 <b>Подсказка:</b>
 Используйте /account для просмотра баланса токенов и купленных псевдонимов
 """
-        await message.answer(help_text, parse_mode=ParseMode.HTML) 
+        await message.answer(help_text, parse_mode=ParseMode.HTML)
+
+def format_username(username):
+    if not username or str(username).lower() == 'none':
+        return 'N/A'
+    return username 

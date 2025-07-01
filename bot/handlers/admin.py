@@ -2,7 +2,7 @@ from aiogram import types, F, Dispatcher
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
-from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication
+from db.wapi import ban_user, unban_user, add_pseudo_name, add_balance, set_balance, get_all_pseudo_names, deactivate_pseudo_name, set_user_level, get_user_info, get_active_posts_count, get_recent_posts, get_all_users, get_queue_info, recalculate_queue_after_immediate_publication, get_user_pseudo_names_full
 import re
 from aiogram.methods import EditMessageReplyMarkup
 import aiohttp
@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import os
 import difflib
+from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
 
 # Импортируем константы из suggest
 POST_INTERVAL_MINUTES = 30
@@ -61,7 +62,10 @@ def register_admin_handlers(dp: Dispatcher):
         if isinstance(msg, types.Message):
             await msg.edit_reply_markup(reply_markup=None)
         elif msg is not None and getattr(msg, "chat", None) is not None and getattr(msg, "message_id", None) is not None:
-            await callback.bot(EditMessageReplyMarkup(chat_id=msg.chat.id, message_id=msg.message_id, reply_markup=None))
+            chat_id = msg.chat.id if getattr(msg, 'chat', None) is not None else None
+            message_id = msg.message_id if getattr(msg, 'message_id', None) is not None else None
+            if chat_id is not None and message_id is not None:
+                await callback.bot(EditMessageReplyMarkup(chat_id=chat_id, message_id=message_id, reply_markup=None))
         
         # Формируем информативное сообщение
         if 'error' in result:
@@ -72,7 +76,10 @@ def register_admin_handlers(dp: Dispatcher):
             ban_message = f"🚫 <b>Пользователь забанен!</b>\n\n"
             ban_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
             ban_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            ban_message += f"👮 <b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
+            admin_name = callback.from_user.username if callback.from_user and getattr(callback.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = callback.from_user.first_name if callback.from_user and getattr(callback.from_user, 'first_name', None) else "Админ"
+            ban_message += f"👮 <b>Админ:</b> {admin_name}"
         
         await callback.answer("Пользователь забанен!", show_alert=True)
     
@@ -109,7 +116,10 @@ def register_admin_handlers(dp: Dispatcher):
             unban_message = f"✅ <b>Пользователь разблокирован!</b>\n\n"
             unban_message += f"👤 <b>Пользователь:</b> {username} (ID: {user_id})\n"
             unban_message += f"⏰ <b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            unban_message += f"👮 <b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            admin_name = message.from_user.username if message.from_user and getattr(message.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = message.from_user.first_name if message.from_user and getattr(message.from_user, 'first_name', None) else "Админ"
+            unban_message += f"👮 <b>Админ:</b> {admin_name}"
         
         await message.answer(unban_message, parse_mode="HTML")
 
@@ -132,7 +142,11 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"<b>Ошибка:</b> {user_info['error']}", parse_mode='HTML')
+            error_text = user_info.get('error', '')
+            if '404' in error_text:
+                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
+            else:
+                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
             return
         
         current_level = int(user_info.get('level', 1))
@@ -183,7 +197,11 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем текущий уровень пользователя
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"<b>Ошибка:</b> {user_info['error']}", parse_mode='HTML')
+            error_text = user_info.get('error', '')
+            if '404' in error_text:
+                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
+            else:
+                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
             return
         
         current_level = int(user_info.get('level', 1))
@@ -206,10 +224,10 @@ def register_admin_handlers(dp: Dispatcher):
             if message.bot:
                 await message.bot.send_message(
                     chat_id=user_id,
-                    text=f"<b>Ваш уровень понижен</b>\n\n"
+                    text=f"<b>Ваш уровень понижен!</b>\n\n"
                          f"Старый уровень: {current_level}\n"
                          f"Новый уровень: {new_level}\n\n"
-                         f"За каждый пост вы получаете меньше токенов",
+                         f"Теперь за каждый пост вы получаете меньше токенов",
                     parse_mode="HTML"
                 )
         except Exception as e:
@@ -237,7 +255,10 @@ def register_admin_handlers(dp: Dispatcher):
             pseudo_message += f"<b>ID:</b> {result['id']}\n"
             pseudo_message += f"<b>Статус:</b> Доступен для покупки\n"
             pseudo_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            pseudo_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            admin_name = message.from_user.username if message.from_user and getattr(message.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = message.from_user.first_name if message.from_user and getattr(message.from_user, 'first_name', None) else "Админ"
+            pseudo_message += f"👮 <b>Админ:</b> {admin_name}"
         elif 'pseudo' in result and 'unique' in str(result['pseudo']):
             pseudo_message = f"<b>Псевдоним уже существует</b>\n\n"
             pseudo_message += f"<b>Имя:</b> \"{nickname}\"\n"
@@ -275,7 +296,11 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}', parse_mode='HTML')
+            error_text = user_info.get('error', '')
+            if '404' in error_text:
+                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
+            else:
+                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -292,7 +317,10 @@ def register_admin_handlers(dp: Dispatcher):
             balance_message += f"<b>Добавлено:</b> +{amount} т.\n"
             balance_message += f"<b>Новый баланс:</b> {result['balance']} т.\n"
             balance_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            balance_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            admin_name = message.from_user.username if message.from_user and getattr(message.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = message.from_user.first_name if message.from_user and getattr(message.from_user, 'first_name', None) else "Админ"
+            balance_message += f"👮 <b>Админ:</b> {admin_name}"
         else:
             balance_message = f"<b>Ошибка обновления баланса</b>\n\n"
             balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
@@ -325,7 +353,11 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе и текущий баланс
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {user_info["error"]}', parse_mode='HTML')
+            error_text = user_info.get('error', '')
+            if '404' in error_text:
+                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
+            else:
+                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -340,7 +372,10 @@ def register_admin_handlers(dp: Dispatcher):
             balance_message += f"<b>Старый баланс:</b> {old_balance} т.\n"
             balance_message += f"<b>Новый баланс:</b> {result['balance']} т.\n"
             balance_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            balance_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            admin_name = message.from_user.username if message.from_user and getattr(message.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = message.from_user.first_name if message.from_user and getattr(message.from_user, 'first_name', None) else "Админ"
+            balance_message += f"👮 <b>Админ:</b> {admin_name}"
         else:
             balance_message = f"<b>Ошибка установки баланса</b>\n\n"
             balance_message += f"<b>Пользователь:</b> {username} (ID: {user_id})\n"
@@ -426,7 +461,10 @@ def register_admin_handlers(dp: Dispatcher):
             deactivate_message += f"<b>ID:</b> {pseudo_id}\n"
             deactivate_message += f"<b>Статус:</b> Недоступен для покупки\n"
             deactivate_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
-            deactivate_message += f"<b>Админ:</b> {message.from_user.username or message.from_user.first_name}"
+            admin_name = message.from_user.username if message.from_user and getattr(message.from_user, 'username', None) else None
+            if not admin_name:
+                admin_name = message.from_user.first_name if message.from_user and getattr(message.from_user, 'first_name', None) else "Админ"
+            deactivate_message += f"👮 <b>Админ:</b> {admin_name}"
         else:
             deactivate_message = f"<b>Ошибка деактивации псевдонима</b>\n\n"
             deactivate_message += f"<b>Имя:</b> \"{pseudo_name}\"\n"
@@ -437,60 +475,82 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("stats"))
     async def stats_handler(message: types.Message):
-        """Показывает статистику системы"""
-        try:
-            # Получаем статистику постов
-            active_posts_count = await get_active_posts_count()
-            posts_data = await get_recent_posts()
-            
-            # Подсчитываем общую статистику постов
-            total_posts = 0
-            posted_posts = 0
-            rejected_posts = 0
-            
-            if isinstance(posts_data, dict) and 'results' in posts_data:
-                posts = posts_data['results']
-                total_posts = len(posts)
-                posted_posts = sum(1 for p in posts if p.get('is_posted', False))
-                rejected_posts = sum(1 for p in posts if p.get('is_rejected', False))
-            
-            # Получаем статистику псевдонимов
-            pseudos = await get_all_pseudo_names()
-            total_pseudos = 0
-            available_pseudos = 0
-            
-            if isinstance(pseudos, list):
-                total_pseudos = len(pseudos)
-                available_pseudos = sum(1 for p in pseudos if p.get('is_available', False))
-            
-            # Формируем статистику
-            stats_message = f"<b>Статистика системы</b>\n\n"
-            stats_message += f"<b>Дата:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-            
-            stats_message += f"<b>Посты:</b>\n"
-            stats_message += f"Всего постов: {total_posts}\n"
-            stats_message += f"Опубликовано: {posted_posts}\n"
-            stats_message += f"Отклонено: {rejected_posts}\n"
-            stats_message += f"В очереди: {active_posts_count}\n\n"
-            
-            stats_message += f"<b>Псевдонимы:</b>\n"
-            stats_message += f"Всего псевдонимов: {total_pseudos}\n"
-            stats_message += f"Доступно: {available_pseudos}\n"
-            stats_message += f"Недоступно: {total_pseudos - available_pseudos}\n\n"
-            
-            # Добавляем информацию о системе
-            stats_message += f"<b>Система:</b>\n"
-            stats_message += f"Бот: Активен\n"
-            stats_message += f"API: Работает\n"
-            stats_message += f"Админ: {message.from_user.username or message.from_user.first_name}"
-            
-            await message.answer(stats_message, parse_mode="HTML")
-            
-        except Exception as e:
-            error_message = f"<b>Ошибка получения статистики</b>\n\n"
-            error_message += f"<b>Ошибка:</b> {str(e)}\n"
-            error_message += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}"
-            await message.answer(error_message, parse_mode="HTML")
+        from datetime import datetime, timezone
+        import aiohttp
+        user_id = message.from_user.id
+        user_info = await get_user_info(user_id)
+        if not user_info or user_info.get('error'):
+            await message.answer("<b>Ошибка: не удалось получить информацию о пользователе</b>", parse_mode="HTML")
+            return
+        pseudos = await get_user_pseudo_names_full(user_id)
+        pseudos_str = ', '.join([p[1] for p in pseudos]) if pseudos else 'Нет'
+        API_BASE = 'http://backend:8000/api/'
+        posts = []
+        async with aiohttp.ClientSession() as session:
+            url = f"{API_BASE}posts/?author={user_id}&page_size=1000"
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, dict) and 'results' in data:
+                        posts = data['results']
+                    elif isinstance(data, list):
+                        posts = data
+        total = len(posts)
+        posted = sum(1 for p in posts if p.get('is_posted'))
+        rejected = sum(1 for p in posts if p.get('is_rejected'))
+        queued = sum(1 for p in posts if not p.get('is_posted') and not p.get('is_rejected'))
+        reg_date = user_info.get('created_at')
+        reg_dt = None
+        days_with_us = None
+        reg_str = 'N/A'
+        if reg_date:
+            try:
+                reg_dt = datetime.fromisoformat(reg_date)
+                reg_str = reg_dt.strftime('%d.%m.%Y, %H:%M')
+                now = datetime.now(timezone.utc)
+                days_with_us = (now - reg_dt.replace(tzinfo=timezone.utc)).days
+            except Exception:
+                reg_str = reg_date
+        # Первый пост
+        first_post = min(posts, key=lambda p: p.get('created_at', '9999'), default=None)
+        first_post_str = ''
+        if first_post and first_post.get('created_at'):
+            try:
+                first_dt = datetime.fromisoformat(first_post['created_at'])
+                first_post_str = f"Ваша первая работа создана {first_dt.strftime('%d.%m.%Y, %H:%M')}\n"
+            except Exception:
+                first_post_str = f"Ваша первая работа создана {first_post['created_at']}\n"
+            first_post_str += f"<i>{first_post.get('content','')[:120]}{'...' if len(first_post.get('content',''))>120 else ''}</i>\n"
+        # Топ-3 самых длинных поста
+        top_posts = sorted(posts, key=lambda p: len(p.get('content','')), reverse=True)[:3]
+        top_posts_str = ''
+        if top_posts and total > 0:
+            top_posts_str = '<b>🏆 Топ-3 самых длинных поста:</b>\n'
+            for i, p in enumerate(top_posts, 1):
+                frag = p.get('content','')[:60].replace('\n',' ')
+                top_posts_str += f"{i}. {frag}{'...' if len(p.get('content',''))>60 else ''} ({len(p.get('content',''))} симв.)\n"
+        # Формируем красивый вывод
+        stats_message = f"<b>Статистика {user_info.get('firstname','') or ''} {user_info.get('lastname','') or ''}</b>\n"
+        stats_message += f"@{user_info.get('username','N/A')}\n"
+        stats_message += f"\n"
+        if reg_dt and days_with_us is not None:
+            stats_message += f"⏱️ Вы с нами с {reg_str}, уже <b>{days_with_us}</b> дней.\n"
+        stats_message += f"\n"
+        stats_message += f"За это время вы успели сделать <b>{total}</b> постов!\n"
+        stats_message += f"<b>✅ Опубликовано:</b> {posted}\n"
+        stats_message += f"<b>❌ Отклонено:</b> {rejected}\n"
+        stats_message += f"<b>🕓 В очереди:</b> {queued}\n"
+        stats_message += f"\n"
+        stats_message += f"<b>🦄 Ваши псевдонимы:</b> {pseudos_str}\n"
+        stats_message += f"<b>💰 Баланс:</b> {user_info.get('balance','N/A')} т.\n"
+        stats_message += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
+        stats_message += f"\n"
+        if top_posts_str:
+            stats_message += top_posts_str + '\n'
+        if first_post_str:
+            stats_message += f"<b>Первая работа</b>\n{first_post_str}\n"
+        stats_message += f"<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
+        await message.answer(stats_message, parse_mode="HTML")
 
     @dp.message(Command("getuser"))
     async def getuser_handler(message: types.Message):
@@ -515,7 +575,7 @@ def register_admin_handlers(dp: Dispatcher):
                 reply = "<b>Пользователь найден по ID:</b>\n\n"
                 reply += (
                     f"ID: <code>{user['id']}</code>\n"
-                    f"Username: @{user.get('username') or 'N/A'}\n"
+                    f"Username: @{format_username(user.get('username'))}\n"
                     f"Имя: {user.get('firstname', '')} {user.get('lastname', '')}\n"
                     f"Баланс: {user.get('balance', 'N/A')}\n"
                     f"Уровень: {user.get('level', 'N/A')}\n"
@@ -558,7 +618,7 @@ def register_admin_handlers(dp: Dispatcher):
         for u in top:
             reply += (
                 f"ID: <code>{u['id']}</code>\n"
-                f"Username: @{u.get('username') or 'N/A'}\n"
+                f"Username: @{format_username(u.get('username'))}\n"
                 f"Имя: {u.get('firstname', '')} {u.get('lastname', '')}\n"
                 f"Баланс: {u.get('balance', 'N/A')}\n"
                 f"Уровень: {u.get('level', 'N/A')}\n"
@@ -569,13 +629,22 @@ def register_admin_handlers(dp: Dispatcher):
         await message.answer(reply, parse_mode="HTML")
 
     def format_queue_message(posts, title="Очередь постов"):
-        count = len(posts)
-        queue_message = f"<b>📋 {title}</b>\n\n"
-        queue_message += f"<b>Всего в очереди:</b> {count} постов\n"
-        queue_message += f"<b>Время запроса:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+        import os
+        from aiogram.utils.formatting import TextLink
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        if offers_chat_id and offers_chat_id.startswith('-100'):
+            offers_chat_id_link = offers_chat_id[4:]
+        else:
+            offers_chat_id_link = offers_chat_id or ''
+        content = []
+        content.append(Bold(f"📋 {title}\n"))
+        content.append(Text("\n"))
+        content.append(Text(f"Всего в очереди: {len(posts)} постов\n"))
+        content.append(Text(f"Время запроса: {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"))
+        content.append(Text("\n"))
         for i, post in enumerate(posts, 1):
             author_id = post.get('author', 'N/A')
-            content = post.get('content', '')
+            content_text = post.get('content', '')
             posted_at_str = post.get('posted_at', 'N/A')
             post_id = post.get('id', 'N/A')
             telegram_id = post.get('telegram_id', 'N/A')
@@ -605,16 +674,24 @@ def register_admin_handlers(dp: Dispatcher):
                 formatted_time = posted_at_str
                 time_until = "ошибка парсинга"
                 status_emoji = "❌"
-            content_preview = content[:80] + '...' if len(content) > 80 else content
+            content_preview = content_text[:80] + '...' if len(content_text) > 80 else content_text
             if not content_preview.strip():
-                content_preview = "<i>Контент не найден</i>"
-            queue_message += f"<b>{i}.</b> {status_emoji} <b>Пост #{post_id}</b>\n"
-            queue_message += f"👤 <b>Автор:</b> {author_id}\n"
-            queue_message += f"📝 <b>Контент:</b> {content_preview}\n"
-            queue_message += f"⏰ <b>Время публикации:</b> {formatted_time}\n"
-            queue_message += f"🕐 <b>Статус:</b> {time_until}\n"
-            queue_message += f"🆔 <b>Telegram ID:</b> {telegram_id}\n"
-            queue_message += f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                content_preview = Italic("Контент не найден")
+            else:
+                content_preview = Text(content_preview)
+            content.append(Bold(f"{i}. {status_emoji} Пост #{post_id}\n"))
+            content.append(Text(f"👤 Автор: {author_id}\n"))
+            content.append(Text("📝 Контент: ") + content_preview + Text("\n"))
+            content.append(Text(f"⏰ Время публикации: {formatted_time}\n"))
+            content.append(Text(f"🕐 Статус: {time_until}\n"))
+            # Формируем ссылку на сообщение по telegram_id
+            if offers_chat_id_link and telegram_id != 'N/A':
+                msg_link = f"https://t.me/c/{offers_chat_id_link}/{telegram_id}"
+                content.append(Text("🆔 Telegram ID: ") + TextLink(str(telegram_id), url=msg_link) + Text("\n"))
+            else:
+                content.append(Text(f"🆔 Telegram ID: {telegram_id}\n"))
+            content.append(Text("━━━━━━━━━━━━━━━━━━━━\n"))
+            content.append(Text("\n"))  # Пустая строка между постами
         # Информация о следующем посте
         if posts:
             first_post = posts[0]
@@ -635,13 +712,14 @@ def register_admin_handlers(dp: Dispatcher):
                                 next_post_info = f"через {minutes}м"
                         else:
                             next_post_info = "готов к публикации"
-                        queue_message += f"<b>📊 Информация:</b>\n"
-                        queue_message += f"• Следующий пост: {next_post_info}\n"
-                        queue_message += f"• Интервал между постами: {POST_INTERVAL_MINUTES} минут\n"
-                        queue_message += f"• Неактивное время: 01:00-10:00 (посты переносятся на 10:00)\n"
+                        content.append(Bold("📊 Информация:\n"))
+                        content.append(Text(f"• Следующий пост: {next_post_info}\n"))
+                        content.append(Text(f"• Интервал между постами: {POST_INTERVAL_MINUTES} минут\n"))
+                        content.append(Text(f"• Неактивное время: 01:00-10:00 (посты переносятся на 10:00)\n"))
+                        content.append(Text("\n"))
                 except:
                     pass
-        return queue_message
+        return ExpandableBlockQuote(*content)
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
@@ -658,7 +736,7 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer("<b>📋 Очередь постов</b>\n\n<blockquote>Очередь пуста — нет запланированных постов</blockquote>", parse_mode="HTML")
             return
         queue_message = format_queue_message(posts, title="Очередь постов")
-        await message.answer(queue_message, parse_mode="HTML")
+        await message.answer(**queue_message.as_kwargs())
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
@@ -666,24 +744,17 @@ def register_admin_handlers(dp: Dispatcher):
         if not await is_admin(message.from_user.id):
             await message.answer("<b>У вас нет прав для выполнения этой команды</b>")
             return
-        await message.answer("<b>Начинаю пересчет очереди...</b>")
         try:
             result = await recalculate_queue_after_immediate_publication()
             if 'error' in result:
                 await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}", parse_mode='HTML')
                 return
-            updated_count = result.get('updated_count', 0)
-            status_message = result.get('message', 'Пересчет завершен')
-            if updated_count == 0:
-                await message.answer("<b>Очередь пуста — нечего пересчитывать</b>", parse_mode='HTML')
-            else:
-                await message.answer(f"<b>{status_message}</b>\n\n<b>Пересчитано постов:</b> {updated_count}", parse_mode='HTML')
-                queue_info = await get_queue_info()
-                if 'error' not in queue_info:
-                    posts = queue_info.get('results', [])
-                    if posts:
-                        queue_message = format_queue_message(posts, title="Обновленная очередь постов")
-                        await message.answer(queue_message, parse_mode="HTML")
+            queue_info = await get_queue_info()
+            if 'error' not in queue_info:
+                posts = queue_info.get('results', [])
+                if posts:
+                    queue_message = format_queue_message(posts, title="Обновленная очередь постов")
+                    await message.answer(**queue_message.as_kwargs())
         except Exception as e:
             logging.exception(f"[queueupdate_handler] Exception: {e}")
             await message.answer(f"❌ Произошла ошибка при пересчете очереди: {str(e)}", parse_mode='HTML')
@@ -712,7 +783,11 @@ def register_admin_handlers(dp: Dispatcher):
         # Получаем информацию о пользователе
         user_info = await get_user_info(user_id)
         if 'error' in user_info:
-            await message.answer(f"❌ Ошибка: {user_info['error']}", parse_mode='HTML')
+            error_text = user_info.get('error', '')
+            if '404' in error_text:
+                await message.answer(f'<b>Пользователь с ID {user_id} не существует.</b>', parse_mode='HTML')
+            else:
+                await message.answer(f'<b>Ошибка получения информации о пользователе:</b> {error_text}', parse_mode='HTML')
             return
         
         username = user_info.get('username', 'N/A') or user_info.get('firstname', 'N/A')
@@ -740,3 +815,8 @@ def register_admin_handlers(dp: Dispatcher):
         except Exception as e:
             logging.error(f"[makeadmin_handler] Exception: {e}")
             await message.answer(f"❌ Произошла ошибка при установке прав: {str(e)}", parse_mode='HTML')
+
+def format_username(username):
+    if not username or str(username).lower() == 'none':
+        return 'N/A'
+    return username

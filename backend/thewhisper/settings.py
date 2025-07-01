@@ -148,3 +148,5 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+API_ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')

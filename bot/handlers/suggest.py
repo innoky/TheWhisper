@@ -10,6 +10,7 @@ from datetime import time
 from db.wapi import get_last_post, try_create_post, mark_post_as_posted, mark_post_as_rejected_by_telegram_id, get_post_by_telegram_id, process_post_payment, get_user_info, get_active_posts_count, publish_post_now, get_last_published_post_time, recalculate_queue_after_immediate_publication
 from SugQueue import publish_to_channel, update_post_channel_info, send_publication_notification
 import logging
+import re
 
 
 ACTIVE_START_HOUR = 10  # 10:00
@@ -185,6 +186,12 @@ def get_content_type_and_text(message: types.Message) -> tuple[str, str]:
         return "unknown", "[UNKNOWN CONTENT]"
 
 
+def format_username(username):
+    if not username or str(username).lower() == 'none':
+        return 'N/A'
+    return username
+
+
 def register_suggest_handler(dp: Dispatcher):
     @dp.message()
     async def suggest_handler(message: types.Message, state: FSMContext):
@@ -203,69 +210,102 @@ def register_suggest_handler(dp: Dispatcher):
         elif message.chat.type == 'private':
             # Получаем тип контента и текст для БД
             content_type, post_content = get_content_type_and_text(message)
-            
-            msg = await message.copy_to(os.getenv('OFFERS_CHAT_ID'))
+            offers_chat_id = os.getenv('OFFERS_CHAT_ID')
+            if offers_chat_id is None:
+                logging.error('OFFERS_CHAT_ID is not set')
+                return
+            if not message.from_user:
+                logging.error('message.from_user is None')
+                return
+            msg = await message.copy_to(offers_chat_id)
+            if msg is None:
+                logging.error('copy_to returned None')
+                return
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{message.from_user.id}")],
                     [InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{message.from_user.id}")]
                 ]
             )
+            # Получаем подробную инфу об авторе
+            author_info = await get_user_info(message.from_user.id)
+            author_username = author_info.get('username', 'N/A')
+            author_firstname = author_info.get('firstname', '')
+            author_lastname = author_info.get('lastname', '')
+            author_level = author_info.get('level', 'N/A')
+            author_balance = author_info.get('balance', 'N/A')
+            # Формируем красивое сообщение для админского чата при поступлении нового поста
+            admin_message = (
+                f"#незапостчено\n"
+                f"<b>Новый пост в предложке</b>\n\n"
+                f"<b>Автор:</b> <code>{message.from_user.id}</code> @{author_username}\n"
+                f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+                f"<b>Уровень:</b> {author_level}\n"
+                f"<b>Баланс:</b> {author_balance} т.\n"
+                f"<b>Тип контента:</b> {content_type}\n"
+                f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+                f"<b>Содержание:</b> {post_content[:300]}{'...' if len(post_content) > 300 else ''}"
+            )
+            if not hasattr(message, 'bot') or message.bot is None:
+                logging.error('message.bot is None')
+                return
             await message.bot.send_message(
-                chat_id=os.getenv("OFFERS_CHAT_ID"),
-                text=(
-                    f"id: {message.from_user.id}\n"
-                    f"username: @{message.from_user.username or 'N/A'}\n"
-                    f"content_type: {content_type}\n\n"
-                ),
+                chat_id=offers_chat_id,
+                text=admin_message,
                 reply_to_message_id=msg.message_id,
                 reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
-            
             # Отправляем уведомление пользователю о том, что пост отправлен на рассмотрение
             await send_submission_notification(message.bot, message.from_user.id, post_content)
 
     @dp.callback_query(F.data.startswith(("reject_",)))
     async def reject_callback(callback: types.CallbackQuery):
+        if not callback.message or not hasattr(callback.message, 'reply_to_message') or callback.message.reply_to_message is None:
+            logging.error('reject_callback: reply_to_message is None')
+            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+            return
         user_id = int(callback.data.split("_")[1])
         original_msg = callback.message.reply_to_message
-        
         # Получаем тип контента и текст для БД
         content_type, post_content = get_content_type_and_text(original_msg)
-        
+        # Получаем подробную инфу об авторе
+        author_info = await get_user_info(user_id)
+        author_username = author_info.get('username', 'N/A')
+        author_firstname = author_info.get('firstname', '')
+        author_lastname = author_info.get('lastname', '')
+        author_level = author_info.get('level', 'N/A')
+        author_balance = author_info.get('balance', 'N/A')
         # Проверяем, есть ли пост в очереди
         post_info = await get_post_by_telegram_id(original_msg.message_id)
-        
         if 'error' not in post_info:
-            # Пост есть в очереди, удаляем его
             result = await mark_post_as_rejected_by_telegram_id(original_msg.message_id)
             logging.info(f"[reject_callback] Post removed from queue: {result}")
         else:
-            # Поста нет в очереди, просто отклоняем
             logging.info(f"[reject_callback] Post not in queue, just rejecting")
-        
         # Формируем сообщение об отклонении для админ чата
         admin_message_text = f"❌ <b>Пост отклонен!</b>\n\n"
-        admin_message_text += f"👤 <b>Автор:</b> {user_id}\n"
+        admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
+        admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+        admin_message_text += f"<b>Уровень:</b> {author_level}\n"
+        admin_message_text += f"<b>Баланс:</b> {author_balance} т.\n"
         admin_message_text += f"📝 <b>Содержание:</b> {post_content[:100]}{'...' if len(post_content) > 100 else ''}\n"
         admin_message_text += f"📄 <b>Тип контента:</b> {content_type}\n\n"
         admin_message_text += f"⏰ <b>Время отклонения:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
         admin_message_text += f"👮 <b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
-        
-        # Редактируем сообщение в админ чате
         await callback.message.edit_text(
             text=admin_message_text,
             parse_mode="HTML"
         )
-        
         await callback.answer("Пост отклонён!")
-        
-        # Отправляем уведомление об отклонении
         await send_rejection_notification(callback.bot, user_id, post_content)
 
     @dp.callback_query(F.data.startswith(("approve_",)))
     async def approve_callback(callback: types.CallbackQuery):
+        if not callback.message or not hasattr(callback.message, 'reply_to_message') or callback.message.reply_to_message is None:
+            logging.error('approve_callback: reply_to_message is None')
+            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+            return
         user_id = int(callback.data.split("_")[1])
         original_msg = callback.message.reply_to_message
         moscow_tz = pytz.timezone('Europe/Moscow')
@@ -366,9 +406,19 @@ def register_suggest_handler(dp: Dispatcher):
             await recalculate_queue_after_immediate_publication()
             # Уведомление пользователю
             await send_publication_and_payment_notification(callback.bot, user_id, post_info.get('content', ''), tokens_added, publish_result.get('author_balance', 'N/A'), channel_message_id)
+            # Получаем подробную инфу об авторе
+            author_info = await get_user_info(user_id)
+            author_username = author_info.get('username', 'N/A')
+            author_firstname = author_info.get('firstname', '')
+            author_lastname = author_info.get('lastname', '')
+            author_level = author_info.get('level', 'N/A')
+            author_balance = author_info.get('balance', 'N/A')
             # Сообщение для админов
             admin_message_text = f"🚀 <b>Пост опубликован и оплачен</b>\n\n"
-            admin_message_text += f"<b>Автор:</b> {user_id}\n"
+            admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
+            admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+            admin_message_text += f"<b>Уровень:</b> {author_level}\n"
+            admin_message_text += f"<b>Баланс:</b> {author_balance} т.\n"
             admin_message_text += f"<b>Содержание:</b> {post_info.get('content', '')[:100]}{'...' if len(post_info.get('content', '')) > 100 else ''}\n\n"
             admin_message_text += f"<b>Оплата:</b>\n"
             admin_message_text += f"<b>Уровень автора:</b> {author_level}\n"
@@ -377,13 +427,20 @@ def register_suggest_handler(dp: Dispatcher):
             admin_message_text += f"<b>ID поста:</b> {post_info['id']}\n"
             admin_message_text += f"<b>Время публикации:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
             admin_message_text += f"<b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
+            admin_message_text = re.sub(r"#незапостчено", "#запостчено", admin_message_text)
             await callback.message.edit_text(text=admin_message_text, parse_mode="HTML")
         else:
             # Время публикации ещё не пришло — ставим в очередь
             scheduled_time_str = scheduled_time.strftime("%d.%m.%Y в %H:%M")
             queue_position = active_posts_count + 1 if active_posts_count > 0 else 1
             await send_approval_notification(callback.bot, user_id, post_content, scheduled_time, queue_position)
-            
+            # Получаем подробную инфу об авторе
+            author_info = await get_user_info(user_id)
+            author_username = author_info.get('username', 'N/A')
+            author_firstname = author_info.get('firstname', '')
+            author_lastname = author_info.get('lastname', '')
+            author_level = author_info.get('level', 'N/A')
+            author_balance = author_info.get('balance', 'N/A')
             # Создаём кнопки для управления постом
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -391,21 +448,28 @@ def register_suggest_handler(dp: Dispatcher):
                     [InlineKeyboardButton(text="Опубликовать сейчас", callback_data=f"publish_now_{user_id}")]
                 ]
             )
-            
-            admin_message_text = f"🕒 <b>Пост поставлен в очередь</b>\n\n"
-            admin_message_text += f"<b>Автор:</b> {user_id}\n"
+            admin_message_text = f"#незапостчено\n🕒 <b>Пост поставлен в очередь</b>\n\n"
+            admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
+            admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+            admin_message_text += f"<b>Уровень:</b> {author_level}\n"
+            admin_message_text += f"<b>Баланс:</b> {author_balance} т.\n"
             admin_message_text += f"<b>Содержание:</b> {post_content[:100]}{'...' if len(post_content) > 100 else ''}\n\n"
             admin_message_text += f"<b>Статус:</b> В очереди\n"
             admin_message_text += f"<b>Позиция в очереди:</b> {queue_position}\n"
             admin_message_text += f"<b>Время публикации:</b> {scheduled_time_str}\n"
             admin_message_text += f"<b>ID поста:</b> {post_info['id']}\n"
             admin_message_text += f"<b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
+            admin_message_text = re.sub(r"#незапостчено", "#запостчено", admin_message_text)
             await callback.message.edit_text(text=admin_message_text, reply_markup=keyboard, parse_mode="HTML")
         await callback.answer("Пост обработан")
 
     @dp.callback_query(F.data.startswith(("publish_now_",)))
     async def publish_now_callback(callback: types.CallbackQuery):
         """Обработчик кнопки 'Опубликовать сейчас' - немедленно публикует пост и оплачивает его"""
+        if not callback.message or not hasattr(callback.message, 'reply_to_message') or callback.message.reply_to_message is None:
+            logging.error('publish_now_callback: reply_to_message is None')
+            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+            return
         user_id = int(callback.data.split("_")[2])
         original_msg = callback.message.reply_to_message
         
@@ -473,9 +537,19 @@ def register_suggest_handler(dp: Dispatcher):
             # Убираем кнопки и показываем результат
             await callback.message.delete_reply_markup()
             
-            # Формируем сообщение о публикации для админ чата
+            # Получаем подробную инфу об авторе
+            author_info = await get_user_info(user_id)
+            author_username = author_info.get('username', 'N/A')
+            author_firstname = author_info.get('firstname', '')
+            author_lastname = author_info.get('lastname', '')
+            author_level = author_info.get('level', 'N/A')
+            author_balance = author_info.get('balance', 'N/A')
+            # Сообщение для админов
             admin_message_text = f"🚀 <b>Пост опубликован и оплачен</b>\n\n"
-            admin_message_text += f"<b>Автор:</b> {user_id}\n"
+            admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
+            admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+            admin_message_text += f"<b>Уровень:</b> {author_level}\n"
+            admin_message_text += f"<b>Баланс:</b> {author_balance} т.\n"
             admin_message_text += f"<b>Содержание:</b> {post_info.get('content', '')[:100]}{'...' if len(post_info.get('content', '')) > 100 else ''}\n\n"
             admin_message_text += f"<b>Оплата:</b>\n"
             admin_message_text += f"<b>Уровень автора:</b> {author_level}\n"
@@ -484,6 +558,7 @@ def register_suggest_handler(dp: Dispatcher):
             admin_message_text += f"<b>ID поста:</b> {post_info['id']}\n"
             admin_message_text += f"<b>Время публикации:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
             admin_message_text += f"<b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
+            admin_message_text = re.sub(r"#незапостчено", "#запостчено", admin_message_text)
             
             # Редактируем сообщение в админ чате
             await callback.message.edit_text(
@@ -498,6 +573,10 @@ def register_suggest_handler(dp: Dispatcher):
     @dp.callback_query(F.data.startswith(("pay_",)))
     async def pay_callback(callback: types.CallbackQuery):
         """Обработчик кнопки 'Выплатить' - выплачивает токены на основе уровня автора"""
+        if not callback.message or not hasattr(callback.message, 'reply_to_message') or callback.message.reply_to_message is None:
+            logging.error('pay_callback: reply_to_message is None')
+            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+            return
         user_id = int(callback.data.split("_")[1])
         original_msg = callback.message.reply_to_message
         
@@ -533,7 +612,11 @@ def register_suggest_handler(dp: Dispatcher):
             # Получаем информацию об авторе для определения уровня
             author_info = await get_user_info(author_id)
             if 'error' in author_info:
-                await callback.answer("❌ Ошибка: не удалось получить информацию об авторе")
+                error_text = author_info.get('error', '')
+                if '404' in error_text:
+                    await callback.answer(f'❌ Пользователь с ID {author_id} не существует')
+                else:
+                    await callback.answer(f'❌ Ошибка: не удалось получить информацию об авторе')
                 return
             
             author_level = author_info.get('level', 1)
@@ -552,6 +635,13 @@ def register_suggest_handler(dp: Dispatcher):
             # Получаем информацию о выплаченных токенах
             tokens_added = payment_result.get('tokens_added', 0)
             
+            # Получаем подробную инфу об авторе
+            author_info = await get_user_info(user_id)
+            author_username = author_info.get('username', 'N/A')
+            author_firstname = author_info.get('firstname', '')
+            author_lastname = author_info.get('lastname', '')
+            author_level = author_info.get('level', 'N/A')
+            author_balance = author_info.get('balance', 'N/A')
             # Формируем сообщение об оплате для админ чата
             admin_message_text = f"<b>Пост оплачен</b>\n\n"
             admin_message_text += f"<b>Автор:</b> {author_id}\n"
@@ -563,6 +653,7 @@ def register_suggest_handler(dp: Dispatcher):
             admin_message_text += f"<b>ID поста:</b> {post_info['id']}\n"
             admin_message_text += f"<b>Время выплаты:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
             admin_message_text += f"<b>Админ:</b> {callback.from_user.username or callback.from_user.first_name}"
+            admin_message_text = re.sub(r"#незапостчено", "#запостчено", admin_message_text)
             
             # Редактируем сообщение в админ чате
             await callback.message.edit_text(

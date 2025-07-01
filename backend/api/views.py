@@ -6,6 +6,7 @@ from .serializers import UserSerializer, CommentSerializer, PostSerializer, Pseu
 from decimal import Decimal
 import decimal
 from datetime import datetime, timezone
+from django.conf import settings
 
 def get_tokens_by_level(level):
     """
@@ -19,6 +20,12 @@ def get_tokens_by_level(level):
     
     # Формула: базовые 5 токенов + 5 токенов за каждый уровень
     return 50 + (level - 1) * 50
+
+def check_access_token(request):
+    token = request.headers.get('X-ACCESS-TOKEN')
+    if not token or token != settings.API_ACCESS_TOKEN:
+        return False
+    return True
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -69,6 +76,8 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def addbalance(self, request, id=None):
+        if not check_access_token(request):
+            return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         user = self.get_object()
         amount = request.data.get('amount')
         try:
@@ -81,6 +90,8 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def setbalance(self, request, id=None):
+        if not check_access_token(request):
+            return Response({'error': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
         user = self.get_object()
         amount = request.data.get('amount')
         try:
