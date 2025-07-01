@@ -534,17 +534,6 @@ def register_admin_handlers(dp: Dispatcher):
         # --- Интересные факты о комментариях ---
         comments = await get_comments_for_user_posts(user_id)
         comments_count = len(comments)
-        # Самый обсуждаемый пост
-        post_counter = Counter(c.get('reply_to') for c in comments if c.get('reply_to'))
-        most_discussed_post_id, most_discussed_count = (post_counter.most_common(1)[0] if post_counter else (None, 0))
-        channel_post_link = None
-        channel_id = os.getenv("CHANNEL_ID")
-        if most_discussed_post_id and channel_id:
-            post_info = await get_post_info(most_discussed_post_id)
-            channel_message_id = post_info.get('channel_message_id') if isinstance(post_info, dict) else None
-            if channel_message_id:
-                channel_id_clean = channel_id[4:] if channel_id.startswith('-100') else channel_id
-                channel_post_link = f"https://t.me/c/{channel_id_clean}/{channel_message_id}"
         # Среднее число комментариев на пост
         avg_comments = round(comments_count / total, 2) if total > 0 else 0
         # --- Синтаксический анализ: топ-слова пользователя ---
@@ -572,8 +561,13 @@ def register_admin_handlers(dp: Dispatcher):
         word_counter = Counter(words)
         top_words = word_counter.most_common(10)
         # Формируем красивый вывод
-        stats_message = f"<b>Статистика {user_info.get('firstname','') or ''} {user_info.get('lastname','') or ''}</b>\n"
-        stats_message += f"@{user_info.get('username','N/A')}\n"
+        firstname = user_info.get('firstname', '') or ''
+        lastname = user_info.get('lastname', '') or ''
+        username = user_info.get('username', None)
+        name_line = f"<b>Статистика {firstname}{(' ' + lastname) if lastname and lastname != 'N/A' else ''}</b>\n"
+        stats_message = name_line
+        if username and username != 'N/A':
+            stats_message += f"@{username}\n"
         stats_message += f"\n"
         if reg_dt and days_with_us is not None:
             stats_message += f"⏱️ Вы с нами с {reg_str}, уже <b>{days_with_us}</b> дней.\n"
@@ -588,8 +582,6 @@ def register_admin_handlers(dp: Dispatcher):
         stats_message += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
         stats_message += f"\n"
         stats_message += f"<b>💬 Комментарии к вашим постам:</b> {comments_count}\n"
-        if channel_post_link:
-            stats_message += f"<b>🔥 Самый обсуждаемый пост:</b> <a href=\"{channel_post_link}\">#{most_discussed_post_id}</a> ({most_discussed_count} комм.)\n"
         stats_message += f"<b>📊 Среднее комментариев на пост:</b> {avg_comments}\n"
         if top_posts_str:
             stats_message += '\n<b>🏆 Топ-3 самых длинных поста:</b>\n'
