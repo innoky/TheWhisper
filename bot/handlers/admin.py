@@ -564,24 +564,24 @@ def register_admin_handlers(dp: Dispatcher):
         firstname = user_info.get('firstname', '') or ''
         lastname = user_info.get('lastname', '') or ''
         username = user_info.get('username', None)
-        name_line = f"<b>👤 Статистика: {firstname}{(' ' + lastname) if lastname and lastname != 'N/A' else ''}</b>\n"
+        name_line = f"<b>Статистика: {firstname}{(' ' + lastname) if lastname and lastname != 'N/A' else ''}</b>\n"
         if username and username != 'N/A':
             name_line += f"<i>@{username}</i>\n"
         name_line += "\n"
         # Блок 'О вас'
         about_block = ""
         if reg_dt and days_with_us is not None:
-            about_block += f"<b>🗓️ С нами:</b> <u>{days_with_us} дней</u>\n"
-        about_block += f"<b>🏅 Уровень:</b> {user_info.get('level','N/A')}\n"
-        about_block += f"<b>💰 Баланс:</b> {user_info.get('balance','N/A')} т.\n"
-        about_block += f"<b>🦄 Псевдонимы:</b> {pseudos_str}\n"
+            about_block += f"<b>С нами:</b> <u>{days_with_us} дней</u>\n"
+        about_block += f"<b>Уровень:</b> {user_info.get('level','N/A')}\n"
+        about_block += f"<b>Баланс:</b> {user_info.get('balance','N/A')} т.\n"
+        about_block += f"<b>Псевдонимы:</b> {pseudos_str}\n"
         about_block += "\n"
         # Блок 'Ваши посты'
-        posts_block = "<b>📊 Ваши посты:</b>\n"
+        posts_block = "<b>Ваши посты:</b>\n"
         posts_block += f"<b>• Всего:</b> {total}\n"
-        posts_block += f"<b>✅ Опубликовано:</b> {posted}\n"
-        posts_block += f"<b>❌ Отклонено:</b> {rejected}\n"
-        posts_block += f"<b>🕓 В очереди:</b> {queued}\n"
+        posts_block += f"<b>Опубликовано:</b> {posted}\n"
+        posts_block += f"<b>Отклонено:</b> {rejected}\n"
+        posts_block += f"<b>В очереди:</b> {queued}\n"
         posts_block += "\n"
         # Топ-3 длинных поста
         top_block = ""
@@ -597,7 +597,7 @@ def register_admin_handlers(dp: Dispatcher):
         # Топ-слова
         words_block = ""
         if top_words:
-            words_block += '<b>📝 Топ-слова ваших постов:</b>\n'
+            words_block += '<b>Топ-слова ваших постов:</b>\n'
             words_block += ', '.join(f'{w} ({c})' for w, c in top_words)
             words_block += '\n'
         # Финальный вывод
