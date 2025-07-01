@@ -478,6 +478,7 @@ def register_admin_handlers(dp: Dispatcher):
     async def stats_handler(message: types.Message):
         from datetime import datetime, timezone
         import aiohttp
+        from collections import Counter
         user_id = message.from_user.id
         user_info = await get_user_info(user_id)
         if not user_info or user_info.get('error'):
