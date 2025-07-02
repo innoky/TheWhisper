@@ -35,7 +35,7 @@ def format_queue_message(posts):
             msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
         blocks.append(
             Bold(f"#{i}") + Text(": ") +
-            (TextLink(f"ID {author_id}", msg_link) if msg_link else Text(f"ID {author_id}")) +
+            (TextLink(f"ID {author_id}", url=msg_link) if msg_link else Text(f"ID {author_id}")) +
             Text(f" | @{username}\n") +
             Text(f"{content}...") +
             Text(f"\nID поста: {post_id}\n")
@@ -633,10 +633,7 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
-        if not admin_chat_id or str(message.chat.id) != str(admin_chat_id):
-            await message.answer(f"DEBUG: chat_id={message.chat.id}, ADMIN_CHAT_ID={admin_chat_id}", parse_mode="HTML")
-            return
+        # Команда теперь работает в любом чате (например, в offers)
         queue_info = await get_queue_info()
         if queue_info.get("error"):
             await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}", parse_mode="HTML")
