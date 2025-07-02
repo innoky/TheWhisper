@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import os
 import difflib
-from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote, as_html
+from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
 from collections import Counter
 
 # Импортируем константы из suggest
@@ -40,7 +40,7 @@ def format_queue_message(posts):
             Text(f"{content}...") +
             Text(f"\nID поста: {post_id}\n")
         )
-    return as_html(ExpandableBlockQuote(*blocks))
+    return str(ExpandableBlockQuote(*blocks))
 
 async def is_admin(user_id: int) -> bool:
     """
