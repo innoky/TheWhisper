@@ -34,10 +34,10 @@ def format_queue_message(posts):
             msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
         blocks.append(
             Bold(f"#{i}") + Text(": ") +
-            (TextLink(f"ID {author_id}", url=msg_link) if msg_link else Text(f"ID {author_id}")) +
-            Text(f" | @{username}\n") +
-            Text(f"{content}...") +
-            Text(f"\nID поста: {post_id}\n")
+            (TextLink(Bold(f"ID {author_id}"), url=msg_link) if msg_link else Bold(f"ID {author_id}")) +
+            Text(" | ") + Italic(f"@{username}") + Text("\n") +
+            Text(f"{content}...") + Text("\n") +
+            Code(f"ID поста: {post_id}") + Text("\n\n")
         )
     return ExpandableBlockQuote(*blocks)
 
