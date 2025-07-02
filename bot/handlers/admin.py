@@ -650,9 +650,9 @@ def register_admin_handlers(dp: Dispatcher):
             return
         text = await format_queue_message(queue_info.get("results", []))
         if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
-            await message.answer(str(text), parse_mode="HTML")
+            await message.answer(str(text), parse_mode="HTML", disable_web_page_preview=True)
         else:
-            await message.answer(**text.as_kwargs())
+            await message.answer(**text.as_kwargs(), disable_web_page_preview=True)
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
@@ -669,7 +669,7 @@ def register_admin_handlers(dp: Dispatcher):
         queue_info = await get_queue_info()
         text = await format_queue_message(queue_info.get("results", []))
         if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
-            await message.answer(str(text), parse_mode="HTML")
+            await message.answer(str(text), parse_mode="HTML", disable_web_page_preview=True)
         else:
-            await message.answer(**text.as_kwargs())
+            await message.answer(**text.as_kwargs(), disable_web_page_preview=True)
 
