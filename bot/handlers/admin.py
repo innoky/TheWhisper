@@ -651,4 +651,7 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}", parse_mode="HTML")
             return
         await message.answer(f"<b>Очередь пересчитана:</b> {result.get('message', 'Готово')}", parse_mode="HTML")
+        queue_info = await get_queue_info()
+        text = format_queue_message(queue_info.get("results", []))
+        await message.answer(**text.as_kwargs())
 
