@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import os
 import difflib
-from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote, as_html
+from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
 from collections import Counter
 
 # Импортируем константы из suggest
