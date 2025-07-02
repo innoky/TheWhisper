@@ -18,7 +18,7 @@ POST_INTERVAL_MINUTES = 30
 
 def format_queue_message(posts):
     if not posts:
-        return "<b>Очередь пуста</b>"
+        return Text("<b>Очередь пуста</b>")
     blocks = []
     offers_chat_id = os.getenv("OFFERS_CHAT_ID", "")
     if offers_chat_id and str(offers_chat_id).startswith("-100"):
@@ -39,7 +39,7 @@ def format_queue_message(posts):
             Text(f"{content}...") +
             Text(f"\nID поста: {post_id}\n")
         )
-    return as_html(ExpandableBlockQuote(*blocks))
+    return ExpandableBlockQuote(*blocks)
 
 async def is_admin(user_id: int) -> bool:
     """
@@ -632,13 +632,12 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        # Команда теперь работает в любом чате (например, в offers)
         queue_info = await get_queue_info()
         if queue_info.get("error"):
-            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}", parse_mode="HTML")
+            await message.answer("<b>Ошибка получения очереди:</b> {}".format(queue_info['error']), parse_mode="HTML")
             return
         text = format_queue_message(queue_info.get("results", []))
-        await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
+        await message.answer(**text.as_kwargs())
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
