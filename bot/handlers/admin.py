@@ -10,11 +10,37 @@ import logging
 from datetime import datetime, timezone, timedelta
 import os
 import difflib
-from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
+from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote, as_markdown, as_html
 from collections import Counter
 
 # Импортируем константы из suggest
 POST_INTERVAL_MINUTES = 30
+
+def format_queue_message(posts):
+    if not posts:
+        return "<b>Очередь пуста</b>"
+    blocks = []
+    offers_chat_id = os.getenv("OFFERS_CHAT_ID", "")
+    if offers_chat_id and str(offers_chat_id).startswith("-100"):
+        offers_chat_id = str(offers_chat_id)[4:]
+    for i, post in enumerate(posts, 1):
+        author_id = post.get('author', 'N/A')
+        username = post.get('author_username', 'N/A')
+        content = post.get('content', '')[:100]
+        post_id = post.get('id', 'N/A')
+        telegram_id = post.get('telegram_id')
+        # Ссылка на сообщение в предложке (если есть)
+        msg_link = None
+        if offers_chat_id and telegram_id:
+            msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
+        blocks.append(
+            Bold(f"#{i}") + Text(": ") +
+            (TextLink(f"ID {author_id}", msg_link) if msg_link else Text(f"ID {author_id}")) +
+            Text(f" | @{username}\n") +
+            Text(f"{content}...") +
+            Text(f"\nID поста: {post_id}\n")
+        )
+    return as_html(ExpandableBlockQuote(*blocks))
 
 async def is_admin(user_id: int) -> bool:
     """
@@ -604,4 +630,29 @@ def register_admin_handlers(dp: Dispatcher):
         stats_message = name_line + about_block + posts_block + top_block + first_block + words_block
         stats_message += "\n<i>Спасибо за активность! Продолжай щитпостить и зарабатывать токены!</i>"
         await message.answer(stats_message, parse_mode="HTML")
+
+    @dp.message(Command("queue"))
+    async def queue_handler(message: types.Message):
+        # Проверяем, что это админский чат
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        if not admin_chat_id or str(message.chat.id) != str(admin_chat_id):
+            return
+        queue_info = await get_queue_info()
+        if queue_info.get("error"):
+            await message.answer(f"<b>Ошибка получения очереди:</b> {queue_info['error']}", parse_mode="HTML")
+            return
+        text = format_queue_message(queue_info.get("results", []))
+        await message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
+
+    @dp.message(Command("queueupdate"))
+    async def queueupdate_handler(message: types.Message):
+        # Проверяем, что это админский чат
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        if not admin_chat_id or str(message.chat.id) != str(admin_chat_id):
+            return
+        result = await recalculate_queue_after_immediate_publication()
+        if result.get("error"):
+            await message.answer(f"<b>Ошибка пересчета очереди:</b> {result['error']}", parse_mode="HTML")
+            return
+        await message.answer(f"<b>Очередь пересчитана:</b> {result.get('message', 'Готово')}", parse_mode="HTML")
 

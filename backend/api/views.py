@@ -133,7 +133,7 @@ class PostViewSet(viewsets.ModelViewSet):
         is_posted = self.request.query_params.get('is_posted', None)
         is_rejected = self.request.query_params.get('is_rejected', None)
         ordering = self.request.query_params.get('ordering', '-posted_at')
-
+        
         if author is not None:
             queryset = queryset.filter(author=author)
         if telegram_id is not None:
