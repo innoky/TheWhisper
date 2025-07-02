@@ -37,7 +37,8 @@ def format_queue_message(posts):
             (TextLink(Bold(f"ID {author_id}"), url=msg_link) if msg_link else Bold(f"ID {author_id}")) +
             Text(" | ") + Italic(f"@{username}") + Text("\n") +
             Text(f"{content}...") + Text("\n") +
-            Code(f"ID поста: {post_id}") + Text("\n\n")
+            Code(f"ID поста: {post_id}") + Text("\n") +
+            (Text("Пост в предложке: ") + TextLink(f"{telegram_id}", url=msg_link) if msg_link else Text("Пост в предложке: N/A")) + Text("\n\n")
         )
     return ExpandableBlockQuote(*blocks)
 
