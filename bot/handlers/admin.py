@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 import os
 import difflib
-from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote
+from aiogram.utils.formatting import ExpandableBlockQuote, Bold, Text, Italic, TextLink, Underline, Code, Pre, BlockQuote, as_html
 from collections import Counter
 
 # Импортируем константы из suggest
@@ -29,7 +29,6 @@ def format_queue_message(posts):
         content = post.get('content', '')[:100]
         post_id = post.get('id', 'N/A')
         telegram_id = post.get('telegram_id')
-        # Ссылка на сообщение в предложке (если есть)
         msg_link = None
         if offers_chat_id and telegram_id:
             msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
@@ -40,7 +39,7 @@ def format_queue_message(posts):
             Text(f"{content}...") +
             Text(f"\nID поста: {post_id}\n")
         )
-    return str(ExpandableBlockQuote(*blocks))
+    return as_html(ExpandableBlockQuote(*blocks))
 
 async def is_admin(user_id: int) -> bool:
     """
