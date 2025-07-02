@@ -633,9 +633,9 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        # Проверяем, что это админский чат
         admin_chat_id = os.getenv("ADMIN_CHAT_ID")
         if not admin_chat_id or str(message.chat.id) != str(admin_chat_id):
+            await message.answer(f"DEBUG: chat_id={message.chat.id}, ADMIN_CHAT_ID={admin_chat_id}", parse_mode="HTML")
             return
         queue_info = await get_queue_info()
         if queue_info.get("error"):
