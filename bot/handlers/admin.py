@@ -16,7 +16,7 @@ from collections import Counter
 # Импортируем константы из suggest
 POST_INTERVAL_MINUTES = 30
 
-def format_queue_message(posts):
+async def format_queue_message(posts):
     if not posts:
         return Text("<b>Очередь пуста</b>")
     blocks = []
@@ -25,7 +25,13 @@ def format_queue_message(posts):
         offers_chat_id = str(offers_chat_id)[4:]
     for i, post in enumerate(posts, 1):
         author_id = post.get('author', 'N/A')
-        username = post.get('author_username', 'N/A')
+        username = post.get('author_username', None)
+        if not username or username == 'N/A':
+            if author_id != 'N/A':
+                user_info = await get_user_info(author_id)
+                username = user_info.get('username', 'N/A') if user_info and not user_info.get('error') else 'N/A'
+            else:
+                username = 'N/A'
         content = post.get('content', '')[:100]
         post_id = post.get('id', 'N/A')
         telegram_id = post.get('telegram_id')
@@ -633,18 +639,27 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
+        if str(message.chat.id) not in allowed_ids:
+            return
         queue_info = await get_queue_info()
         if queue_info.get("error"):
             await message.answer("<b>Ошибка получения очереди:</b> {}".format(queue_info['error']), parse_mode="HTML")
             return
-        text = format_queue_message(queue_info.get("results", []))
-        await message.answer(**text.as_kwargs())
+        text = await format_queue_message(queue_info.get("results", []))
+        if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
+            await message.answer(str(text), parse_mode="HTML")
+        else:
+            await message.answer(**text.as_kwargs())
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
-        # Проверяем, что это админский чат
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
         admin_chat_id = os.getenv("ADMIN_CHAT_ID")
-        if not admin_chat_id or str(message.chat.id) != str(admin_chat_id):
+        allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
+        if str(message.chat.id) not in allowed_ids:
             return
         result = await recalculate_queue_after_immediate_publication()
         if result.get("error"):
@@ -652,6 +667,9 @@ def register_admin_handlers(dp: Dispatcher):
             return
         await message.answer(f"<b>Очередь пересчитана:</b> {result.get('message', 'Готово')}", parse_mode="HTML")
         queue_info = await get_queue_info()
-        text = format_queue_message(queue_info.get("results", []))
-        await message.answer(**text.as_kwargs())
+        text = await format_queue_message(queue_info.get("results", []))
+        if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
+            await message.answer(str(text), parse_mode="HTML")
+        else:
+            await message.answer(**text.as_kwargs())
 
