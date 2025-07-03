@@ -705,7 +705,7 @@ def register_admin_handlers(dp: Dispatcher):
                     user = u
                     found_by = 'username/first_name'
                     break
-        # Поиск по username и first_name с опечатками (Левенштейн, топ-3)
+        # Поиск по username и first_name с опечатками (Левенштейн, топ-3, низкий порог)
         similar = []
         if not user:
             candidates = []
@@ -716,11 +716,10 @@ def register_admin_handlers(dp: Dispatcher):
                     candidates.append((u, uname, 'username'))
                 if fname:
                     candidates.append((u, fname, 'first_name'))
-            # Считаем схожесть
             import difflib
             scored = [ (u, field, difflib.SequenceMatcher(None, value.lower(), query.lower()).ratio()) for u, value, field in candidates ]
             scored = sorted(scored, key=lambda x: x[2], reverse=True)
-            similar = [ (u, field, score) for u, field, score in scored if score > 0.4 ][:3 ]
+            similar = [ (u, field, score) for u, field, score in scored if score > 0.25 ][:3 ]
             if similar:
                 user = similar[0][0]
                 found_by = f'similar_{similar[0][1]}'
@@ -745,15 +744,14 @@ def register_admin_handlers(dp: Dispatcher):
             if found_by:
                 lines.append(f"<i>Найдено по: {found_by}{f' (score: {score:.2f})' if score is not None else ''}</i>")
             return '\n'.join(lines)
-        # Выводим результат
-        if user:
+        # Выводим результат — только одно сообщение
+        if user and not similar:
             await message.answer(format_user(user, found_by), parse_mode='HTML')
-            # Если есть похожие, выводим их тоже
-            if similar:
-                msg = "\n\n<b>Похожие пользователи:</b>\n"
-                for u, field, score in similar:
-                    msg += format_user(u, found_by=field, score=score) + "\n---\n"
-                await message.answer(msg, parse_mode='HTML')
+        elif similar:
+            msg = "<b>Похожие пользователи:</b>\n"
+            for u, field, score in similar:
+                msg += format_user(u, found_by=field, score=score) + "\n---\n"
+            await message.answer(msg, parse_mode='HTML')
         else:
             await message.answer("Пользователь не найден. Попробуйте другой запрос.")
 
