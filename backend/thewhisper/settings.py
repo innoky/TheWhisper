@@ -48,13 +48,13 @@ USE_TZ = True
 TIME_ZONE = 'Europe/Moscow'
 
 REST_FRAMEWORK = {
-    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z",  # ISO-формат с временной зоной
+    'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z", 
     'DATETIME_INPUT_FORMATS': [
-        "%Y-%m-%dT%H:%M:%S%z",  # С зоной
-        "%Y-%m-%dT%H:%M:%S",    # Без зоны (будет считать локальным)
+        "%Y-%m-%dT%H:%M:%S%z",  
+        "%Y-%m-%dT%H:%M:%S",   
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 50,
+    'PAGE_SIZE': 1000,
 }
 
 MIDDLEWARE = [
