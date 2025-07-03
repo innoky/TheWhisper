@@ -699,21 +699,18 @@ def register_admin_handlers(dp: Dispatcher):
         # Поиск по username (точное совпадение)
         if not user or user.get('error'):
             for u in all_users:
-                if u.get('username', '').lower() == query.lower():
+                if (u.get('username') or '').lower() == query.lower():
                     user = u
                     found_by = 'username'
                     break
-        # Поиск по username (похожие, Левенштейн)
-        if (not user or user.get('error')) and all_users:
-            usernames = [u.get('username', '') or '' for u in all_users]
-            matches = difflib.get_close_matches(query, usernames, n=3, cutoff=0.6)
-            if matches:
-                # Берём первого похожего
-                for u in all_users:
-                    if u.get('username', '') == matches[0]:
-                        user = u
-                        found_by = 'levenshtein'
-                        break
+        # Поиск по username с опечатками (Левенштейн)
+        if not user:
+            usernames = [(u, (u.get('username') or '')) for u in all_users]
+            similar = [(u, difflib.SequenceMatcher(None, (uname).lower(), query.lower()).ratio()) for u, uname in usernames if uname]
+            similar = sorted(similar, key=lambda x: x[1])
+            if similar and similar[0][1] > 0.6:
+                user = similar[0][0]
+                found_by = 'username_levenshtein'
         # Если не найдено
         if not user or user.get('error'):
             # Предложить похожие
