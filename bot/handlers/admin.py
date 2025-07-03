@@ -673,3 +673,73 @@ def register_admin_handlers(dp: Dispatcher):
         else:
             await message.answer(**text.as_kwargs(), disable_web_page_preview=True)
 
+    @dp.message(Command("getuser"))
+    async def getuser_handler(message: types.Message):
+        # Проверка чата
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
+        if str(message.chat.id) not in allowed_ids:
+            return
+        
+        # Парсим аргумент
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2:
+            await message.answer("Использование: /getuser <user_id или username>")
+            return
+        query = parts[1].strip().lstrip('@')
+        user = None
+        all_users = await get_all_users()
+        found_by = None
+        # Поиск по ID
+        if query.isdigit():
+            user = await get_user_info(int(query))
+            if user and not user.get('error'):
+                found_by = 'id'
+        # Поиск по username (точное совпадение)
+        if not user or user.get('error'):
+            for u in all_users:
+                if u.get('username', '').lower() == query.lower():
+                    user = u
+                    found_by = 'username'
+                    break
+        # Поиск по username (похожие, Левенштейн)
+        if (not user or user.get('error')) and all_users:
+            usernames = [u.get('username', '') or '' for u in all_users]
+            matches = difflib.get_close_matches(query, usernames, n=3, cutoff=0.6)
+            if matches:
+                # Берём первого похожего
+                for u in all_users:
+                    if u.get('username', '') == matches[0]:
+                        user = u
+                        found_by = 'levenshtein'
+                        break
+        # Если не найдено
+        if not user or user.get('error'):
+            # Предложить похожие
+            usernames = [u.get('username', '') or '' for u in all_users]
+            matches = difflib.get_close_matches(query, usernames, n=5, cutoff=0.4)
+            if matches:
+                await message.answer(f"Пользователь не найден. Возможно, вы имели в виду: " + ", ".join([f"@{m}" for m in matches]))
+            else:
+                await message.answer("Пользователь не найден.")
+            return
+        # Получаем расширенную инфу (купленные ники)
+        user_id = user.get('id')
+        pseudos = await get_user_pseudo_names_full(user_id) if user_id else []
+        pseudos_str = ', '.join([p[1] for p in pseudos]) if pseudos else 'Нет'
+        # Формируем ответ
+        info = f"<b>Информация о пользователе</b>\n"
+        info += f"<b>ID:</b> {user.get('id', 'N/A')}\n"
+        info += f"<b>Username:</b> @{user.get('username', 'N/A')}\n"
+        info += f"<b>Имя:</b> {user.get('firstname', 'N/A')} {user.get('lastname', '')}\n"
+        info += f"<b>Уровень:</b> {user.get('level', 'N/A')}\n"
+        info += f"<b>Баланс:</b> {user.get('balance', 'N/A')} т.\n"
+        info += f"<b>Псевдонимы:</b> {pseudos_str}\n"
+        info += f"<b>Забанен:</b> {'Да' if user.get('is_banned') else 'Нет'}\n"
+        info += f"<b>Админ:</b> {'Да' if user.get('is_admin') else 'Нет'}\n"
+        info += f"<b>Дата регистрации:</b> {user.get('created_at', 'N/A')}\n"
+        if found_by == 'levenshtein':
+            info += f"\n<i>⚠️ Найден по похожему username</i>"
+        await message.answer(info, parse_mode="HTML")
+
