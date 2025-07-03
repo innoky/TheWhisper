@@ -755,3 +755,16 @@ def register_admin_handlers(dp: Dispatcher):
         else:
             await message.answer("Пользователь не найден. Попробуйте другой запрос.")
 
+    @dp.message(Command("debugusers"))
+    async def debugusers_handler(message: types.Message):
+        all_users = await get_all_users()
+        if not all_users:
+            await message.answer("Пользователи не найдены.")
+            return
+        msg = f"Всего пользователей: {len(all_users)}\n"
+        for u in all_users:
+            msg += f"ID: {u.get('id')} | username: {u.get('username') or '-'}\n"
+        # Если сообщение слишком длинное, разбиваем
+        for i in range(0, len(msg), 3500):
+            await message.answer(msg[i:i+3500])
+
