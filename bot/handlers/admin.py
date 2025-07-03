@@ -691,52 +691,69 @@ def register_admin_handlers(dp: Dispatcher):
         user = None
         all_users = await get_all_users()
         found_by = None
-        # Поиск по ID
+        # Поиск по user_id
         if query.isdigit():
-            user = await get_user_info(int(query))
-            if user and not user.get('error'):
-                found_by = 'id'
-        # Поиск по username (точное совпадение)
-        if not user or user.get('error'):
             for u in all_users:
-                if (u.get('username') or '').lower() == query.lower():
+                if str(u.get('id')) == query:
                     user = u
-                    found_by = 'username'
+                    found_by = 'user_id'
                     break
-        # Поиск по username с опечатками (Левенштейн)
+        # Поиск по username и first_name (точное совпадение)
         if not user:
-            usernames = [(u, (u.get('username') or '')) for u in all_users]
-            similar = [(u, difflib.SequenceMatcher(None, (uname).lower(), query.lower()).ratio()) for u, uname in usernames if uname]
-            similar = sorted(similar, key=lambda x: x[1])
-            if similar and similar[0][1] > 0.6:
+            for u in all_users:
+                if (u.get('username') or '').lower() == query.lower() or (u.get('first_name') or '').lower() == query.lower():
+                    user = u
+                    found_by = 'username/first_name'
+                    break
+        # Поиск по username и first_name с опечатками (Левенштейн, топ-3)
+        similar = []
+        if not user:
+            candidates = []
+            for u in all_users:
+                uname = (u.get('username') or '')
+                fname = (u.get('first_name') or '')
+                if uname:
+                    candidates.append((u, uname, 'username'))
+                if fname:
+                    candidates.append((u, fname, 'first_name'))
+            # Считаем схожесть
+            import difflib
+            scored = [ (u, field, difflib.SequenceMatcher(None, value.lower(), query.lower()).ratio()) for u, value, field in candidates ]
+            scored = sorted(scored, key=lambda x: x[2], reverse=True)
+            similar = [ (u, field, score) for u, field, score in scored if score > 0.4 ][:3 ]
+            if similar:
                 user = similar[0][0]
-                found_by = 'username_levenshtein'
-        # Если не найдено
-        if not user or user.get('error'):
-            # Предложить похожие
-            usernames = [u.get('username', '') or '' for u in all_users]
-            matches = difflib.get_close_matches(query, usernames, n=5, cutoff=0.4)
-            if matches:
-                await message.answer(f"Пользователь не найден. Возможно, вы имели в виду: " + ", ".join([f"@{m}" for m in matches]))
-            else:
-                await message.answer("Пользователь не найден.")
-            return
-        # Получаем расширенную инфу (купленные ники)
-        user_id = user.get('id')
-        pseudos = await get_user_pseudo_names_full(user_id) if user_id else []
-        pseudos_str = ', '.join([p[1] for p in pseudos]) if pseudos else 'Нет'
-        # Формируем ответ
-        info = f"<b>Информация о пользователе</b>\n"
-        info += f"<b>ID:</b> {user.get('id', 'N/A')}\n"
-        info += f"<b>Username:</b> @{user.get('username', 'N/A')}\n"
-        info += f"<b>Имя:</b> {user.get('firstname', 'N/A')} {user.get('lastname', '')}\n"
-        info += f"<b>Уровень:</b> {user.get('level', 'N/A')}\n"
-        info += f"<b>Баланс:</b> {user.get('balance', 'N/A')} т.\n"
-        info += f"<b>Псевдонимы:</b> {pseudos_str}\n"
-        info += f"<b>Забанен:</b> {'Да' if user.get('is_banned') else 'Нет'}\n"
-        info += f"<b>Админ:</b> {'Да' if user.get('is_admin') else 'Нет'}\n"
-        info += f"<b>Дата регистрации:</b> {user.get('created_at', 'N/A')}\n"
-        if found_by == 'levenshtein':
-            info += f"\n<i>⚠️ Найден по похожему username</i>"
-        await message.answer(info, parse_mode="HTML")
+                found_by = f'similar_{similar[0][1]}'
+        # Формируем красивый вывод
+        def format_user(u, found_by=None, score=None):
+            lines = []
+            lines.append(f"<b>ID:</b> {u.get('id')}")
+            if u.get('username'):
+                lines.append(f"<b>Username:</b> @{u.get('username')}")
+            if u.get('first_name'):
+                lines.append(f"<b>Имя:</b> {u.get('first_name')}")
+            if u.get('level') is not None:
+                lines.append(f"<b>Уровень:</b> {u.get('level')}")
+            if u.get('balance') is not None:
+                lines.append(f"<b>Баланс:</b> {u.get('balance')}")
+            if u.get('is_banned'):
+                lines.append(f"<b>Забанен:</b> Да")
+            if u.get('is_admin'):
+                lines.append(f"<b>Админ:</b> Да")
+            if u.get('created_at'):
+                lines.append(f"<b>Регистрация:</b> {u.get('created_at')}")
+            if found_by:
+                lines.append(f"<i>Найдено по: {found_by}{f' (score: {score:.2f})' if score is not None else ''}</i>")
+            return '\n'.join(lines)
+        # Выводим результат
+        if user:
+            await message.answer(format_user(user, found_by), parse_mode='HTML')
+            # Если есть похожие, выводим их тоже
+            if similar:
+                msg = "\n\n<b>Похожие пользователи:</b>\n"
+                for u, field, score in similar:
+                    msg += format_user(u, found_by=field, score=score) + "\n---\n"
+                await message.answer(msg, parse_mode='HTML')
+        else:
+            await message.answer("Пользователь не найден. Попробуйте другой запрос.")
 
