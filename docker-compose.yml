@@ -51,7 +51,6 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'  # Можно убрать авторизацию по организациям
       TZ: Europe/Moscow
     ports:
       - "5050:80"
