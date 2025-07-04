@@ -74,6 +74,7 @@ services:
   #     - "8080:8080"
 volumes:
   pgdata:
+  pgadmin_data:
 
 networks:
   app-network:
