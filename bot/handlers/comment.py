@@ -253,6 +253,8 @@ def register_comment_handlers(dp: Dispatcher):
 
             with open(messages_path, "r", encoding="utf-8") as f:
                 messages = json.load(f)
+            param = message.text.replace("/start ", "")
+            await state.update_data(target_message_id=int(param))
             await message.answer(
                 text=messages['request_comment']['text'].format(rules_url="https://telegra.ph/Pravila-anonimnyh-kommentariev-06-17"),
                 reply_markup = cancel_kb,
