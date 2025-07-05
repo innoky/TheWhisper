@@ -5,10 +5,15 @@ from aiogram.enums import ParseMode
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 
+import json
+from pathlib import Path
+
 import logging
 from db.wapi import leave_anon_comment, get_user_pseudo_names_full, is_user_banned, ensure_user_has_default_pseudos, get_comment_by_telegram_id, send_comment_reply_notification
 import os
 from keyboards.reply import build_nick_choice_keyboard
+from keyboards.reply import cancel_kb
+
 
 NICKS_PER_PAGE = 5
 CHAT_ID = os.getenv("CHAT_ID")
@@ -233,35 +238,50 @@ def register_comment_handlers(dp: Dispatcher):
     @dp.message(CommentState.waiting_for_comment, F.text)
     async def handle_comment_text(message: types.Message, state: FSMContext):
         logging.info(f"[handle_comment_text] User {message.from_user.id} trying to comment with text")
-        if await is_user_banned(message.from_user.id):
+        if message.text.startswith("/start"):
+              
+            current_dir = Path(__file__).parent  # bot/handlers/
+            assets_dir = current_dir.parent / "assets"  # поднимаемся на уровень выше и идем в assets
+            messages_path = assets_dir / "messages.json"
+
+
+            with open(messages_path, "r", encoding="utf-8") as f:
+                messages = json.load(f)
+            await message.answer(
+                text=messages['request_comment']['text'].format(rules_url="https://telegra.ph/Pravila-anonimnyh-kommentariev-06-17"),
+                reply_markup = cancel_kb,
+                parse_mode=ParseMode.HTML,
+            )
+            
+        elif await is_user_banned(message.from_user.id):
             await message.answer("<b>Вы забанены и не можете оставлять комментарии</b>", parse_mode=ParseMode.HTML)
             await state.clear()
             return
-
+        else:
         # Убеждаемся, что у пользователя есть псевдонимы
-        await ensure_user_has_default_pseudos(message.from_user.id)
+            await ensure_user_has_default_pseudos(message.from_user.id)
 
-        pseudo_names = await get_user_pseudo_names_full(message.from_user.id)
-        logging.info(f"[handle_comment_text] User {message.from_user.id} has pseudo_names: {pseudo_names}")
-        if not pseudo_names:
-            logging.warning(f"[handle_comment_text] User {message.from_user.id} has no pseudo names after ensuring")
-            await message.answer("<b>У вас нет купленных псевдонимов</b>\n\n<blockquote>Купите псевдоним в /market</blockquote>", parse_mode=ParseMode.HTML)
-            await state.clear()
-            return
-        await state.update_data(
-            media_type="text",
-            comment_text=message.text,
-            nick_page=0
-        )
-        # Убираем обычную клавиатуру перед показом inline-клавиатуры
-        await message.answer("<i>Теперь выберите ник для публикации комментария:</i>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
-        kb = build_nick_choice_keyboard(pseudo_names, page=0)
-        await state.set_state(CommentState.waiting_for_nick)
-        await message.answer(
-            f"<b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите псевдоним для публикации:</b>",
-            reply_markup=kb,
-            parse_mode=ParseMode.HTML
-        )
+            pseudo_names = await get_user_pseudo_names_full(message.from_user.id)
+            logging.info(f"[handle_comment_text] User {message.from_user.id} has pseudo_names: {pseudo_names}")
+            if not pseudo_names:
+                logging.warning(f"[handle_comment_text] User {message.from_user.id} has no pseudo names after ensuring")
+                await message.answer("<b>У вас нет купленных псевдонимов</b>\n\n<blockquote>Купите псевдоним в /market</blockquote>", parse_mode=ParseMode.HTML)
+                await state.clear()
+                return
+            await state.update_data(
+                media_type="text",
+                comment_text=message.text,
+                nick_page=0
+            )
+            # Убираем обычную клавиатуру перед показом inline-клавиатуры
+            await message.answer("<i>Теперь выберите ник для публикации комментария:</i>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
+            kb = build_nick_choice_keyboard(pseudo_names, page=0)
+            await state.set_state(CommentState.waiting_for_nick)
+            await message.answer(
+                f"<b>Ваш комментарий:</b>\n\n<blockquote>{message.text}</blockquote>\n\n<b>Выберите псевдоним для публикации:</b>",
+                reply_markup=kb,
+                parse_mode=ParseMode.HTML
+            )
 
     @dp.callback_query(F.data.startswith("nickpage_"), CommentState.waiting_for_nick)
     async def nick_page_callback(callback: types.CallbackQuery, state: FSMContext):
