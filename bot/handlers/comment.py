@@ -52,7 +52,13 @@ def register_comment_handlers(dp: Dispatcher):
         await state.clear()
         await message.answer("<b>Комментирование отменено</b>", reply_markup=ReplyKeyboardRemove(), parse_mode=ParseMode.HTML)
 
+    @dp.message(CommentState.waiting_for_comment, F.video)
+    async def handle_video(message: types.Message, state: FSMContext):
+        logging.info(f"[handle_photo] User {message.from_user.id} trying to comment with photo")
 
+        await message.answer(
+            text ="<b>Анонимные комментарии не поддерживают отправку видео</b>\n\nПопробуйте другой формат сообщения",
+            parse_mode=ParseMode.HTML)
     @dp.message(CommentState.waiting_for_comment, F.photo)
     async def handle_photo(message: types.Message, state: FSMContext):
         logging.info(f"[handle_photo] User {message.from_user.id} trying to comment with photo")
@@ -456,3 +462,4 @@ def register_comment_handlers(dp: Dispatcher):
             await state.clear()
             await callback.answer("Комментарий отправлен!")
 
+        
