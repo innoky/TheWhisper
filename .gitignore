@@ -47,3 +47,6 @@ coverage.xml
 # Migrations (если хочешь их игнорировать, но обычно лучше хранить)
 # backend/api/migrations/
 
+
+
+./rust_service
