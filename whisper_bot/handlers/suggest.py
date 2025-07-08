@@ -16,7 +16,7 @@ import re
 ACTIVE_START_HOUR = 10  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
 POST_INTERVAL_MINUTES = 30
-BOT_NAME = os.getenv("BOT_NAME")
+BOT_NAME = os.getenv("WHISPER_BOT_NAME")
 
 async def send_submission_notification(bot, user_id: int, post_content: str):
     """Отправляет уведомление пользователю о том, что пост отправлен на рассмотрение"""
@@ -121,7 +121,7 @@ async def send_publication_and_payment_notification(bot, user_id: int, post_cont
     """Отправляет объединенное уведомление о публикации и оплате"""
     try:
         # Формируем ссылку на пост в канале
-        channel_id = os.getenv("CHANNEL_ID")
+        channel_id = os.getenv("WHISPER_CHANNEL_ID")
         if not channel_id:
             logging.error(f"[send_publication_and_payment_notification] CHANNEL_ID not set")
             return
@@ -210,7 +210,7 @@ def register_suggest_handler(dp: Dispatcher):
         elif message.chat.type == 'private':
             # Получаем тип контента и текст для БД
             content_type, post_content = get_content_type_and_text(message)
-            offers_chat_id = os.getenv('OFFERS_CHAT_ID')
+            offers_chat_id = os.getenv('WHISPER_OFFERS_CHAT_ID')
             if offers_chat_id is None:
                 logging.error('OFFERS_CHAT_ID is not set')
                 return

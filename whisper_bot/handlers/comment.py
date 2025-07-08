@@ -16,10 +16,10 @@ from keyboards.reply import cancel_kb
 
 
 NICKS_PER_PAGE = 5
-CHAT_ID = os.getenv("CHAT_ID")
-TARGET_CHAT_ID = os.getenv("TARGET_CHAT_ID")
-BOT_NAME = os.getenv("BOT_NAME")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+CHAT_ID = os.getenv("WHISPER_TARGET_CHAT_ID")
+TARGET_CHAT_ID = os.getenv("WHISPER_TARGET_CHAT_ID")
+BOT_NAME = os.getenv("WHISPER_BOT_NAME")
+ADMIN_CHAT_ID = os.getenv("WHISPER_ADMIN_CHAT_ID")
 
 # Проверяем, что все необходимые переменные окружения установлены
 if not all([CHAT_ID, TARGET_CHAT_ID, BOT_NAME, ADMIN_CHAT_ID]):

@@ -22,7 +22,7 @@ async def send_publication_notification(bot: Bot, post: dict, channel_message_id
             return
         
         # Формируем ссылку на пост в канале
-        channel_id = os.getenv("CHANNEL_ID")
+        channel_id = os.getenv("ORACLE_CHANNEL_ID")
         if not channel_id:
             print(f"[send_publication_notification] CHANNEL_ID not set")
             return
@@ -63,7 +63,7 @@ async def send_publication_and_payment_notification(bot: Bot, post: dict, channe
             return
         
         # Формируем ссылку на пост в канале
-        channel_id = os.getenv("CHANNEL_ID")
+        channel_id = os.getenv("ORACLE_CHANNEL_ID")
         if not channel_id:
             print(f"[send_publication_and_payment_notification] CHANNEL_ID not set")
             return
@@ -102,16 +102,16 @@ async def send_publication_and_payment_notification(bot: Bot, post: dict, channe
 async def publish_to_channel(post, bot) -> tuple[bool, int]:
     """Публикует пост в Telegram-канал и возвращает ID сообщения в канале"""
     try:
-        fci = os.getenv("OFFERS_CHAT_ID")
+        fci = os.getenv("ORACLE_OFFERS_CHAT_ID")
         mi = post["telegram_id"]
-        ci = os.getenv("CHANNEL_ID")
+        ci = os.getenv("ORACLE_CHANNEL_ID")
         print(f"Publishing post: from_chat_id={fci}, message_id={mi}, chat_id={ci}")
         
         # Копируем сообщение в канал и получаем ID нового сообщения
         channel_message = await bot.copy_message(
-            from_chat_id=os.getenv("OFFERS_CHAT_ID"),
+            from_chat_id=os.getenv("ORACLE_OFFERS_CHAT_ID"),
             message_id=post["telegram_id"],
-            chat_id=os.getenv("CHANNEL_ID")
+            chat_id=os.getenv("ORACLE_CHANNEL_ID")
         )
         
         print(f"Post published successfully! Channel message ID: {channel_message.message_id}")
@@ -132,8 +132,8 @@ async def mark_as_posted(post_id: int) -> None:
 async def post_checker(bot):
     """Основной цикл проверки постов"""
     print(f"Starting post checker...")
-    print(f"OFFERS_CHAT_ID: {os.getenv('OFFERS_CHAT_ID')}")
-    print(f"CHANNEL_ID: {os.getenv('CHANNEL_ID')}")
+    print(f"OFFERS_CHAT_ID: {os.getenv('ORACLE_OFFERS_CHAT_ID')}")
+    print(f"CHANNEL_ID: {os.getenv('ORACLE_CHANNEL_ID')}")
     
     # Счетчик для пересчета очереди (каждые 10 циклов = 200 секунд)
     queue_recalc_counter = 0

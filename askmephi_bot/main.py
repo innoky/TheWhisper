@@ -45,9 +45,9 @@ def main():
             logging.FileHandler('app.log', mode='a')
         ]
     )
-    BOT_TOKEN = os.getenv('BOT_TOKEN')
+    BOT_TOKEN = os.getenv('ORACLE_BOT_TOKEN')
     if not BOT_TOKEN:
-        raise ValueError("BOT_TOKEN environment variable is not set")
+        raise ValueError("ORACLE_BOT_TOKEN environment variable is not set")
     bot = Bot(token=BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)

@@ -957,7 +957,7 @@ async def send_comment_reply_notification(bot, original_comment_author_id: int, 
     
     try:
         # Формируем ссылку на ответ - используем CHAT_ID для ссылок
-        channel_id = os.getenv("CHAT_ID")
+        channel_id = os.getenv("WHISPER_TARGET_CHAT_ID")
         if not channel_id:
             logging.error(f"[send_comment_reply_notification] CHAT_ID not set")
             return

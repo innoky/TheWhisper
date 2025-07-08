@@ -20,7 +20,7 @@ async def format_queue_message(posts):
     if not posts:
         return Text("<b>Очередь пуста</b>")
     blocks = []
-    offers_chat_id = os.getenv("OFFERS_CHAT_ID", "")
+    offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID", "")
     if offers_chat_id and str(offers_chat_id).startswith("-100"):
         offers_chat_id = str(offers_chat_id)[4:]
     for i, post in enumerate(posts, 1):
@@ -639,8 +639,8 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ORACLE_ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return
@@ -656,8 +656,8 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
-        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ORACLE_ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return
@@ -676,8 +676,8 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("getuser"))
     async def getuser_handler(message: types.Message):
         # Проверка чата
-        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ORACLE_ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return

@@ -1,6 +1,12 @@
 from django.db import models
 
+###########################################################################################
 
+"""
+=====================================
+Universal USER model for all services
+=====================================
+"""
 class User(models.Model):
     id = models.BigIntegerField(primary_key=True)  
     username = models.CharField(max_length=150, null=True, blank=True) 
@@ -17,6 +23,90 @@ class User(models.Model):
         db_table = "users"
         verbose_name = "User"
         verbose_name_plural = "Users"
+
+
+#########################################################################################
+
+"""
+===============================================
+Abstarct post model for AskMephi and TheWhisper
+===============================================
+"""
+class AbstractBasePost(models.Model):
+    id = models.AutoField(primary_key=True)
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    content = models.TextField()
+    media_type = models.CharField(max_length=32, null=True, blank=True)
+    posted_at = models.DateTimeField()
+
+    is_rejected = models.BooleanField(default=False)
+    is_posted = models.BooleanField(default=False)
+
+    telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
+    channel_message_id = models.BigIntegerField(null=True, blank=True)
+    channel_posted_at = models.DateTimeField(null=True, blank=True)
+    is_paid = models.BooleanField(default=False)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-posted_at']
+
+"""
+=====================================
+Posts implementation from abstarct model
+=====================================
+"""
+class Post(AbstractBasePost):
+    class Meta(AbstractBasePost.Meta):
+        db_table = "posts"
+
+
+class AskPost(AbstractBasePost):
+    class Meta(AbstractBasePost.Meta):
+        db_table = "ask_posts"
+
+#########################################################################################
+
+
+"""
+===============================================
+Abstarct comments model for AskMephi and TheWhisper
+===============================================
+"""
+
+class AbstractBaseComment(models.Model):
+    id = models.AutoField(primary_key=True)
+    reply_to = models.BigIntegerField(null=True, blank=True, help_text='ID тг-поста или комментария, на который идет ответ')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+
+"""
+=====================================
+Comments implementation from abstarct model
+=====================================
+"""
+
+class Comment(AbstractBaseComment):
+    class Meta(AbstractBaseComment.Meta):
+        db_table = "comments"
+        verbose_name = "Comment"
+        verbose_name_plural = "Comments"
+
+
+class AskComment(AbstractBaseComment):
+    class Meta(AbstractBaseComment.Meta):
+        db_table = "ask_comments"
+        verbose_name = "Ask Comment"
+        verbose_name_plural = "Ask Comments"
+
+##########################################################################################
 
 
 class AuthCredential(models.Model):
@@ -49,26 +139,6 @@ class LoginToken(models.Model):
         verbose_name_plural = "Login Tokens"
 
 
-class Post(models.Model):
-    id = models.AutoField(primary_key=True)
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='posts')
-    content = models.TextField()
-    media_type = models.CharField(max_length=32, null=True, blank=True)
-    posted_at = models.DateTimeField()
-    
-    is_rejected = models.BooleanField(default=False)
-    is_posted = models.BooleanField(default=False)
-
-    telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
-
-    channel_message_id = models.BigIntegerField(null=True, blank=True)  # ID сообщения в канале
-    channel_posted_at = models.DateTimeField(null=True, blank=True)     # Когда был выложен в канал
-    is_paid = models.BooleanField(default=False)                        # Получена ли оплата
-    paid_at = models.DateTimeField(null=True, blank=True)               # Когда была выплачена оплата
-
-    class Meta:
-        db_table = "posts"
-        ordering = ['-posted_at']
 
 class Comment(models.Model):
     id = models.AutoField(primary_key=True)

@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from .models import User, Comment, Post, PseudoNames, UserPseudoName, PromoCode, PromoCodeActivation
+from .models import AskPost, AskComment
+
+######################################  USERS BLOCK  ##############################################
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -7,21 +10,70 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'firstname', 'lastname', 'balance', 'level', 'is_admin', 'is_banned']
         read_only_fields = ['balance', 'level', 'is_banned']
 
-class PostSerializer(serializers.ModelSerializer):
-    author = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
-    class Meta:
-        model = Post
-        fields = ['id', 'author', 'content', 'media_type', 'posted_at', 'is_rejected', 'is_posted', 'telegram_id', 
-                 'channel_message_id', 'channel_posted_at', 'is_paid', 'paid_at']
-        read_only_fields = ['is_paid', 'paid_at']
 
-class CommentSerializer(serializers.ModelSerializer):
+######################################  POSTS BLOCK  ##################################################
+"""
+==================================
+Basic posts serializer
+==================================
+"""
+class AbstractBasePostSerializer(serializers.ModelSerializer):
     author = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
     author_details = UserSerializer(source='author', read_only=True)
-    
+
     class Meta:
-        model = Comment
+        abstract = True
+        fields = ['id', 'author', 'author_details', 'content', 'media_type', 'posted_at', 
+                  'is_rejected', 'is_posted', 'telegram_id', 'channel_message_id', 
+                  'channel_posted_at', 'is_paid', 'paid_at']
+        read_only_fields = ['is_paid', 'paid_at']
+
+"""
+=====================================
+implementation of serializers
+=====================================
+"""
+
+class AskPostSerializer(AbstractBasePostSerializer):
+    class Meta(AbstractBasePostSerializer.Meta):
+        model = AskPost
+
+
+class PostSerializer(AbstractBasePostSerializer):
+    class Meta(AbstractBasePostSerializer.Meta):
+        model = Post
+    
+##################################  COMMENTS BLOCK  ####################################################
+
+"""
+==================================
+Basic comments serializer
+==================================
+"""
+class AbstractBaseCommentSerializer(serializers.ModelSerializer):
+    author = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    author_details = UserSerializer(source='author', read_only=True)
+
+    class Meta:
+        abstract = True
         fields = ['id', 'reply_to', 'author', 'author_details', 'content', 'created_at', 'telegram_id']
+
+"""
+=====================================
+implementation of serializers
+=====================================
+"""
+
+class CommentSerializer(AbstractBaseCommentSerializer):
+    class Meta(AbstractBaseCommentSerializer.Meta):
+        model = Comment
+
+
+class AskCommentSerializer(AbstractBaseCommentSerializer):
+    class Meta(AbstractBaseCommentSerializer.Meta):
+        model = AskComment
+
+###############################################################################################################
 
 class PseudoNameSerializer(serializers.ModelSerializer):
     class Meta:

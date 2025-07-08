@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import User, Comment, Post, PseudoNames, UserPseudoName, PromoCode, PromoCodeActivation
-from .serializers import UserSerializer, CommentSerializer, PostSerializer, PseudoNameSerializer, UserPseudoNameSerializer, PromoCodeSerializer, PromoCodeActivationSerializer
+from .models import User, Comment, Post, PseudoNames, UserPseudoName, PromoCode, PromoCodeActivation, AskPost, AskComment
+from .serializers import UserSerializer, CommentSerializer, PostSerializer, PseudoNameSerializer, UserPseudoNameSerializer, PromoCodeSerializer, PromoCodeActivationSerializer, AskPostSerializer, AskCommentSerializer
 from decimal import Decimal
 import decimal
 from datetime import datetime, timezone
@@ -335,4 +335,79 @@ class PromoCodeViewSet(viewsets.ModelViewSet):
 class PromoCodeActivationViewSet(viewsets.ModelViewSet):
     queryset = PromoCodeActivation.objects.all()
     serializer_class = PromoCodeActivationSerializer
+    lookup_field = 'id'
+
+class AskPostViewSet(viewsets.ModelViewSet):
+    queryset = AskPost.objects.all().order_by('-posted_at')
+    serializer_class = AskPostSerializer
+    lookup_field = 'id'
+
+    @action(detail=True, methods=['post'])
+    def mark_as_posted(self, request, id=None):
+        post = self.get_object()
+        post.is_posted = True
+        post.channel_posted_at = datetime.now(timezone.utc)
+        post.save()
+        return Response({'id': post.id, 'is_posted': post.is_posted, 'channel_posted_at': post.channel_posted_at, 'status': 'updated'})
+
+    @action(detail=True, methods=['post'])
+    def mark_as_rejected(self, request, id=None):
+        post = self.get_object()
+        post.is_rejected = True
+        post.save()
+        return Response({'id': post.id, 'is_rejected': post.is_rejected, 'status': 'updated'})
+
+    @action(detail=True, methods=['post'])
+    def process_payment(self, request, id=None):
+        post = self.get_object()
+        if post.is_paid:
+            return Response({'error': 'Post already paid'}, status=status.HTTP_400_BAD_REQUEST)
+        if not post.channel_message_id:
+            return Response({'error': 'Post not yet posted to channel'}, status=status.HTTP_400_BAD_REQUEST)
+        if not post.author:
+            return Response({'error': 'Post has no author'}, status=status.HTTP_400_BAD_REQUEST)
+        tokens_to_add = get_tokens_by_level(post.author.level)
+        post.is_paid = True
+        post.paid_at = datetime.now(timezone.utc)
+        post.save()
+        post.author.balance += Decimal(str(tokens_to_add))
+        post.author.save()
+        return Response({
+            'id': post.id,
+            'author_level': post.author.level,
+            'tokens_added': tokens_to_add,
+            'author_balance': str(post.author.balance),
+            'status': 'payment processed'
+        })
+
+    @action(detail=True, methods=['post'])
+    def publish_now(self, request, id=None):
+        post = self.get_object()
+        if post.is_posted:
+            return Response({'error': 'Post already published'}, status=status.HTTP_400_BAD_REQUEST)
+        if not post.author:
+            return Response({'error': 'Post has no author'}, status=status.HTTP_400_BAD_REQUEST)
+        if not post.telegram_id:
+            return Response({'error': 'Post has no telegram_id'}, status=status.HTTP_400_BAD_REQUEST)
+        post.is_posted = True
+        post.channel_posted_at = datetime.now(timezone.utc)
+        post.save()
+        tokens_to_add = get_tokens_by_level(post.author.level)
+        post.is_paid = True
+        post.paid_at = datetime.now(timezone.utc)
+        post.save()
+        post.author.balance += Decimal(str(tokens_to_add))
+        post.author.save()
+        return Response({
+            'id': post.id,
+            'telegram_id': post.telegram_id,
+            'author_level': post.author.level,
+            'tokens_added': tokens_to_add,
+            'author_balance': str(post.author.balance),
+            'status': 'published and paid'
+        })
+
+class AskCommentViewSet(viewsets.ModelViewSet):
+    queryset = AskComment.objects.all().order_by('-created_at')
+    serializer_class = AskCommentSerializer
     lookup_field = 'id'

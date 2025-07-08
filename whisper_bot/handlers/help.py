@@ -11,7 +11,7 @@ def register_help_handlers(dp: Dispatcher):
         """Показывает справку по командам в зависимости от типа чата"""
         
         # Проверяем, что это админский чат
-        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
+        admin_chat_id = os.getenv("WHISPER_ADMIN_CHAT_ID")
         is_admin_chat = admin_chat_id and str(message.chat.id) == str(admin_chat_id)
         
         if is_admin_chat:
