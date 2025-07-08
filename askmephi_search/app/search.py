@@ -8,7 +8,7 @@ VECTORIZER = None
 MATRIX = None
 QUESTIONS_CACHE = []
 
-THRESHOLD = 0.5  # Порог схожести
+THRESHOLD = 0.2  # Порог схожести
 
 
 def build_index():

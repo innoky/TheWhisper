@@ -1,6 +1,7 @@
 from aiogram import types, F, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode, ContentType
 from datetime import datetime, timedelta, timezone
@@ -11,11 +12,12 @@ from db.wapi import get_last_post, try_create_post, mark_post_as_posted, mark_po
 from SugQueue import publish_to_channel, update_post_channel_info, send_publication_notification
 import logging
 import re
+import aiohttp
 
 
-ACTIVE_START_HOUR = 10  # 10:00
+ACTIVE_START_HOUR = 6  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
-POST_INTERVAL_MINUTES = 30
+POST_INTERVAL_MINUTES = 20
 BOT_NAME = os.getenv("ORACLE_BOT_NAME")
 
 async def send_submission_notification(bot, user_id: int, post_content: str):
@@ -192,6 +194,10 @@ def format_username(username):
     return username
 
 
+class SuggestStates(StatesGroup):
+    waiting_for_confirm = State()
+
+
 def register_suggest_handler(dp: Dispatcher):
     @dp.message()
     async def suggest_handler(message: types.Message, state: FSMContext):
@@ -207,57 +213,116 @@ def register_suggest_handler(dp: Dispatcher):
                 reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
-        elif message.chat.type == 'private':
-            # Получаем тип контента и текст для БД
+            return
+
+        if message.chat.type == 'private':
             content_type, post_content = get_content_type_and_text(message)
-            offers_chat_id = os.getenv('ORACLE_OFFERS_CHAT_ID')
-            if offers_chat_id is None:
-                logging.error('ORACLE_OFFERS_CHAT_ID is not set')
-                return
-            if not message.from_user:
-                logging.error('message.from_user is None')
-                return
-            msg = await message.copy_to(offers_chat_id)
-            if msg is None:
-                logging.error('copy_to returned None')
-                return
+            user_id = message.from_user.id
+
+            # Поиск похожего вопроса через микросервис
+            found_similar = False
+            similar_link = None
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "http://askmephi_search:8001/search/",
+                        params={"question": post_content},
+                        timeout=5
+                    ) as resp:
+                        data = await resp.json()
+                if data.get("found"):
+                    found_similar = True
+                    similar_link = data["link"]
+            except Exception as e:
+                logging.warning(f"[suggest_handler] tf-idf search error: {e}")
+
+            # Сохраняем все нужные данные в state
+            await state.update_data(
+                post_content=post_content,
+                content_type=content_type,
+                message_id=message.message_id,
+                from_user=message.from_user.id
+            )
+
+            if found_similar:
+                text = (
+                    f"Похожий вопрос уже был опубликован!\n"
+                    f"Посмотрите: {similar_link}\n\n"
+                    f"Ваш вопрос:\n<code>{post_content}</code>\n\n"
+                    f"Все равно отправить этот вопрос в предложку?"
+                )
+            else:
+                text = (
+                    f"Ваш вопрос:\n<code>{post_content}</code>\n\n"
+                    f"Отправить этот вопрос в предложку?"
+                )
+
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{message.from_user.id}")],
-                    [InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{message.from_user.id}")]
+                    [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
                 ]
             )
-            # Получаем подробную инфу об авторе
-            author_info = await get_user_info(message.from_user.id)
-            author_username = author_info.get('username', 'N/A')
-            author_firstname = author_info.get('firstname', '')
-            author_lastname = author_info.get('lastname', '')
-            author_level = author_info.get('level', 'N/A')
-            author_balance = author_info.get('balance', 'N/A')
-            # Формируем красивое сообщение для админского чата при поступлении нового поста
-            admin_message = (
-                f"#незапостчено\n"
-                f"<b>Новый пост в предложке</b>\n\n"
-                f"<b>Автор:</b> <code>{message.from_user.id}</code> @{author_username}\n"
-                f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
-                f"<b>Уровень:</b> {author_level}\n"
-                f"<b>Баланс:</b> {author_balance} т.\n"
-                f"<b>Тип контента:</b> {content_type}\n"
-                f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-                f"<b>Содержание:</b> {post_content[:300]}{'...' if len(post_content) > 300 else ''}"
-            )
-            if not hasattr(message, 'bot') or message.bot is None:
-                logging.error('message.bot is None')
-                return
-            await message.bot.send_message(
-                chat_id=offers_chat_id,
-                text=admin_message,
-                reply_to_message_id=msg.message_id,
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
-            # Отправляем уведомление пользователю о том, что пост отправлен на рассмотрение
-            await send_submission_notification(message.bot, message.from_user.id, post_content)
+            await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+            await state.set_state(SuggestStates.waiting_for_confirm)
+            return
+
+    @dp.callback_query(F.data.startswith("confirm_suggest_"))
+    async def confirm_suggest_callback(callback: types.CallbackQuery, state: FSMContext):
+        user_id = int(callback.data.split("_")[-1])
+        data = await state.get_data()
+        post_content = data.get("post_content")
+        content_type = data.get("content_type")
+        message_id = data.get("message_id")
+        from_user = data.get("from_user")
+        offers_chat_id = os.getenv('ORACLE_OFFERS_CHAT_ID')
+        if offers_chat_id is None:
+            logging.error('ORACLE_OFFERS_CHAT_ID is not set')
+            await callback.answer("Ошибка: не настроен offers_chat_id")
+            return
+
+        # 1. Копируем сообщение пользователя в offers_chat_id
+        msg = await callback.bot.copy_message(
+            chat_id=offers_chat_id,
+            from_chat_id=callback.message.chat.id,
+            message_id=message_id
+        )
+
+        # 2. Формируем admin_message
+        author_info = await get_user_info(user_id)
+        author_username = author_info.get('username', 'N/A')
+        author_firstname = author_info.get('firstname', '')
+        author_lastname = author_info.get('lastname', '')
+        author_level = author_info.get('level', 'N/A')
+        author_balance = author_info.get('balance', 'N/A')
+        admin_message = (
+            f"#незапостчено\n"
+            f"<b>Новый пост в предложке</b>\n\n"
+            f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
+            f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
+            f"<b>Уровень:</b> {author_level}\n"
+            f"<b>Баланс:</b> {author_balance} т.\n"
+            f"<b>Тип контента:</b> {content_type}\n"
+            f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
+            f"<b>Содержание:</b> {post_content[:300]}{'...' if len(post_content) > 300 else ''}"
+        )
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}")],
+                [InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}")]
+            ]
+        )
+        await callback.bot.send_message(
+            chat_id=offers_chat_id,
+            text=admin_message,
+            reply_to_message_id=msg.message_id,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
+
+        # 3. Уведомление пользователю
+        await send_submission_notification(callback.bot, user_id, post_content)
+        await callback.answer("Вопрос отправлен!")
+        await state.clear()
 
     @dp.callback_query(F.data.startswith(("reject_",)))
     async def reject_callback(callback: types.CallbackQuery):
