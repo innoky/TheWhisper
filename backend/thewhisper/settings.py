@@ -29,6 +29,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "bot", 
     "backend",
+    "askmephi_search",
+    "localhost",
     "127.0.0.1"]
 
 
