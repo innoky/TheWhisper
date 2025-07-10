@@ -420,10 +420,11 @@ def register_suggest_handler(dp: Dispatcher):
             logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
 
         # Создаём пост через API
-        create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
-        if 'error' in create_result:
-            await callback.answer("Ошибка создания поста!")
-            return
+        # Удаляю вызов:
+        # create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
+        # if 'error' in create_result:
+        #     await callback.answer("Ошибка создания поста!")
+        #     return
 
         # Получаем post_info по telegram_id
         post_info = await get_post_by_telegram_id(telegram_id)
