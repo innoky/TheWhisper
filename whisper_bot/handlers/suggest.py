@@ -262,8 +262,8 @@ def register_suggest_handler(dp: Dispatcher):
         )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{original_msg.message_id}"),
-                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{original_msg.message_id}")]
+                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}_{original_msg.message_id}"),
+                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}_{original_msg.message_id}")]
             ]
         )
         author_info = await get_user_info(user_id)
@@ -299,15 +299,17 @@ def register_suggest_handler(dp: Dispatcher):
 
     @dp.callback_query(F.data.startswith(("reject_",)))
     async def reject_callback(callback: types.CallbackQuery):
-        msg_obj = callback.message
-        if not msg_obj or not hasattr(msg_obj, 'reply_to_message') or not isinstance(msg_obj.reply_to_message, Message):
-            logging.error('reject_callback: reply_to_message is not a valid Message')
-            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+        # Парсим user_id и telegram_id из callback_data
+        _, user_id, telegram_id = callback.data.split("_")
+        user_id = int(user_id)
+        telegram_id = int(telegram_id)
+        # Получаем пост из БД
+        post_info = await get_post_by_telegram_id(telegram_id)
+        if 'error' in post_info:
+            await callback.answer('Ошибка: пост не найден в базе данных')
             return
-        user_id = int(callback.data.split("_")[1])
-        original_msg = msg_obj.reply_to_message
-        # Получаем тип контента и текст для БД
-        content_type, post_content = get_content_type_and_text(original_msg)
+        content_type = post_info.get('media_type', 'text')
+        post_content = post_info.get('content', '')
         # Получаем подробную инфу об авторе
         author_info = await get_user_info(user_id)
         author_username = author_info.get('username', 'N/A')
@@ -315,13 +317,9 @@ def register_suggest_handler(dp: Dispatcher):
         author_lastname = author_info.get('lastname', '')
         author_level = author_info.get('level', 'N/A')
         author_balance = author_info.get('balance', 'N/A')
-        # Проверяем, есть ли пост в очереди
-        post_info = await get_post_by_telegram_id(original_msg.message_id)
-        if 'error' not in post_info:
-            result = await mark_post_as_rejected_by_telegram_id(original_msg.message_id)
-            logging.info(f"[reject_callback] Post removed from queue: {result}")
-        else:
-            logging.info(f"[reject_callback] Post not in queue, just rejecting")
+        # Отклоняем пост
+        result = await mark_post_as_rejected_by_telegram_id(telegram_id)
+        logging.info(f"[reject_callback] Post removed from queue: {result}")
         # Формируем сообщение об отклонении для админ чата
         admin_message_text = f"❌ <b>Пост отклонен!</b>\n\n"
         admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
@@ -341,23 +339,28 @@ def register_suggest_handler(dp: Dispatcher):
 
     @dp.callback_query(F.data.startswith(("approve_",)))
     async def approve_callback(callback: types.CallbackQuery):
-        msg_obj = callback.message
-        if not msg_obj or not hasattr(msg_obj, 'reply_to_message') or not isinstance(msg_obj.reply_to_message, Message):
-            logging.error('approve_callback: reply_to_message is not a valid Message')
-            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
+        # Парсим user_id и telegram_id из callback_data
+        _, user_id, telegram_id = callback.data.split("_")
+        user_id = int(user_id)
+        telegram_id = int(telegram_id)
+        # Получаем пост из БД
+        post_info = await get_post_by_telegram_id(telegram_id)
+        if 'error' in post_info:
+            await callback.answer('Ошибка: пост не найден в базе данных')
             return
-        original_msg = msg_obj.reply_to_message
-        if not original_msg or not hasattr(original_msg, 'from_user') or not original_msg.from_user:
-            await callback.answer("Ошибка: не удалось определить пользователя")
-            return
-        user_id = original_msg.from_user.id
-        content_type, post_content = get_content_type_and_text(original_msg)
+        post_content = post_info.get('content', '')
+        content_type = post_info.get('media_type', 'text')
+        # Получаем автора
+        author_info = await get_user_info(user_id)
+        username = author_info.get('username', None)
+        firstname = author_info.get('firstname', None)
+        lastname = author_info.get('lastname', None)
         # Гарантируем, что пользователь есть в базе
         await try_create_user(
             user_id=user_id,
-            username=original_msg.from_user.username,
-            firstname=original_msg.from_user.first_name,
-            lastname=original_msg.from_user.last_name
+            username=username,
+            firstname=firstname,
+            lastname=lastname
         )
         moscow_tz = pytz.timezone('Europe/Moscow')
         now = datetime.now(timezone(timedelta(hours=3)))
