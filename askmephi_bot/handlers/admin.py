@@ -23,7 +23,9 @@ async def format_queue_message(posts):
     offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID", "")
     if offers_chat_id and str(offers_chat_id).startswith("-100"):
         offers_chat_id = str(offers_chat_id)[4:]
-    for i, post in enumerate(posts, 1):
+    # Фильтруем только неотклонённые и не опубликованные посты
+    filtered_posts = [p for p in posts if not p.get('is_rejected', False) and not p.get('is_posted', False)]
+    for i, post in enumerate(filtered_posts, 1):
         author_id = post.get('author', 'N/A')
         username = post.get('author_username', None)
         if not username or username == 'N/A':
@@ -38,13 +40,28 @@ async def format_queue_message(posts):
         msg_link = None
         if offers_chat_id and telegram_id:
             msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
+        # Форматируем время публикации
+        posted_at = post.get('posted_at')
+        posted_at_str = ''
+        if posted_at:
+            try:
+                dt = datetime.fromisoformat(posted_at)
+                import pytz
+                moscow_tz = pytz.timezone('Europe/Moscow')
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.astimezone(moscow_tz)
+                posted_at_str = dt.strftime('%d.%m.%Y %H:%M')
+            except Exception:
+                posted_at_str = str(posted_at)
         blocks.append(
             Bold(f"#{i}") + Text(": ") +
             (TextLink(Bold(f"ID {author_id}"), url=msg_link) if msg_link else Bold(f"ID {author_id}")) +
             Text(" | ") + Italic(f"@{username}") + Text("\n") +
             Text(f"{content}...") + Text("\n") +
             Code(f"ID поста: {post_id}") + Text("\n") +
-            (Text("Пост в предложке: ") + TextLink(f"{telegram_id}", url=msg_link) if msg_link else Text("Пост в предложке: N/A")) + Text("\n\n")
+            (Text("Пост в предложке: ") + TextLink(f"{telegram_id}", url=msg_link) if msg_link else Text("Пост в предложке: N/A")) + Text("\n") +
+            (Text(f"Время публикации: {posted_at_str}") if posted_at_str else Text("")) + Text("\n\n")
         )
     return ExpandableBlockQuote(*blocks)
 

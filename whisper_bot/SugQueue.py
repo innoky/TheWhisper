@@ -4,7 +4,7 @@ import time
 import os
 import datetime
 from datetime import timezone, timedelta
-from db.wapi import get_recent_posts, mark_post_as_posted, update_post_channel_info, get_user_info, process_post_payment, recalculate_queue_after_immediate_publication
+from db.wapi import get_recent_posts, mark_post_as_posted, update_post_channel_info, get_user_info, process_post_payment, recalculate_queue_after_immediate_publication, rebuild_post_queue
 
 
 async def send_publication_notification(bot: Bot, post: dict, channel_message_id: int):
@@ -141,19 +141,19 @@ async def post_checker(bot):
     while True:
         try:
             # Пересчитываем очередь в начале каждого цикла для максимальной актуальности
-            print(f"[post_checker] Performing queue recalculation at cycle start...")
+            print(f"[post_checker] Performing queue rebuild at cycle start...")
             try:
-                recalc_result = await recalculate_queue_after_immediate_publication()
+                recalc_result = await rebuild_post_queue()
                 if 'error' in recalc_result:
-                    print(f"[post_checker] Queue recalculation failed: {recalc_result['error']}")
+                    print(f"[post_checker] Queue rebuild failed: {recalc_result['error']}")
                 else:
                     updated_count = int(recalc_result.get('updated_count', 0))
                     if updated_count > 0:
-                        print(f"[post_checker] Queue recalculated at cycle start: {updated_count} posts updated")
+                        print(f"[post_checker] Queue rebuilt at cycle start: {updated_count} posts updated")
                     else:
-                        print(f"[post_checker] Queue recalculation at cycle start completed: no posts to update")
+                        print(f"[post_checker] Queue rebuild at cycle start completed: no posts to update")
             except Exception as e:
-                print(f"[post_checker] Exception during queue recalculation at cycle start: {e}")
+                print(f"[post_checker] Exception during queue rebuild at cycle start: {e}")
             
             # Создаем текущее время с часовым поясом UTC
             now = datetime.datetime.now(datetime.timezone.utc)
@@ -171,19 +171,19 @@ async def post_checker(bot):
             # Пересчитываем очередь каждые 10 циклов (200 секунд) - дополнительная проверка
             queue_recalc_counter += 1
             if queue_recalc_counter >= 10:
-                print(f"[post_checker] Performing periodic queue recalculation...")
+                print(f"[post_checker] Performing periodic queue rebuild...")
                 try:
-                    recalc_result = await recalculate_queue_after_immediate_publication()
+                    recalc_result = await rebuild_post_queue()
                     if 'error' in recalc_result:
-                        print(f"[post_checker] Periodic queue recalculation failed: {recalc_result['error']}")
+                        print(f"[post_checker] Periodic queue rebuild failed: {recalc_result['error']}")
                     else:
                         updated_count = int(recalc_result.get('updated_count', 0))
                         if updated_count > 0:
-                            print(f"[post_checker] Periodic queue recalculated: {updated_count} posts updated")
+                            print(f"[post_checker] Periodic queue rebuilt: {updated_count} posts updated")
                         else:
-                            print(f"[post_checker] Periodic queue recalculation completed: no posts to update")
+                            print(f"[post_checker] Periodic queue rebuild completed: no posts to update")
                 except Exception as e:
-                    print(f"[post_checker] Exception during periodic queue recalculation: {e}")
+                    print(f"[post_checker] Exception during periodic queue rebuild: {e}")
                 
                 queue_recalc_counter = 0  # Сбрасываем счетчик
             
@@ -254,16 +254,16 @@ async def post_checker(bot):
                             await send_publication_notification(bot, post, channel_message_id)
                         
                         # Пересчитываем очередь после публикации поста
-                        print(f"[post_checker] Recalculating queue after post publication...")
+                        print(f"[post_checker] Rebuilding queue after post publication...")
                         try:
-                            recalc_result = await recalculate_queue_after_immediate_publication()
+                            recalc_result = await rebuild_post_queue()
                             if 'error' in recalc_result:
-                                print(f"[post_checker] Queue recalculation after publication failed: {recalc_result['error']}")
+                                print(f"[post_checker] Queue rebuild after publication failed: {recalc_result['error']}")
                             else:
                                 updated_count = int(recalc_result.get('updated_count', 0))
-                                print(f"[post_checker] Queue recalculated after publication: {updated_count} posts updated")
+                                print(f"[post_checker] Queue rebuilt after publication: {updated_count} posts updated")
                         except Exception as e:
-                            print(f"[post_checker] Exception during queue recalculation after publication: {e}")
+                            print(f"[post_checker] Exception during queue rebuild after publication: {e}")
                     else:
                         print(f"Failed to publish post {post['id']}")
                 else:

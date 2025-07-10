@@ -20,7 +20,7 @@ async def format_queue_message(posts):
     if not posts:
         return Text("<b>Очередь пуста</b>")
     blocks = []
-    offers_chat_id = os.getenv("WHISPER_OFFERS_CHAT_ID", "")
+    offers_chat_id = os.getenv("OFFERS_CHAT_ID", "")
     if offers_chat_id and str(offers_chat_id).startswith("-100"):
         offers_chat_id = str(offers_chat_id)[4:]
     for i, post in enumerate(posts, 1):
@@ -38,27 +38,13 @@ async def format_queue_message(posts):
         msg_link = None
         if offers_chat_id and telegram_id:
             msg_link = f"https://t.me/c/{offers_chat_id}/{telegram_id}"
-        posted_at = post.get('posted_at')
-        posted_at_str = ''
-        if posted_at:
-            try:
-                dt = datetime.fromisoformat(posted_at)
-                import pytz
-                moscow_tz = pytz.timezone('Europe/Moscow')
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                dt = dt.astimezone(moscow_tz)
-                posted_at_str = dt.strftime('%d.%m.%Y %H:%M')
-            except Exception:
-                posted_at_str = str(posted_at)
         blocks.append(
             Bold(f"#{i}") + Text(": ") +
             (TextLink(Bold(f"ID {author_id}"), url=msg_link) if msg_link else Bold(f"ID {author_id}")) +
             Text(" | ") + Italic(f"@{username}") + Text("\n") +
             Text(f"{content}...") + Text("\n") +
             Code(f"ID поста: {post_id}") + Text("\n") +
-            (Text("Пост в предложке: ") + TextLink(f"{telegram_id}", url=msg_link) if msg_link else Text("Пост в предложке: N/A")) + Text("\n") +
-            (Text(f"Время публикации: {posted_at_str}") if posted_at_str else Text("")) + Text("\n\n")
+            (Text("Пост в предложке: ") + TextLink(f"{telegram_id}", url=msg_link) if msg_link else Text("Пост в предложке: N/A")) + Text("\n\n")
         )
     return ExpandableBlockQuote(*blocks)
 
@@ -653,8 +639,8 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queue"))
     async def queue_handler(message: types.Message):
-        offers_chat_id = os.getenv("WHISPER_OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("WHISPER_ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return
@@ -670,8 +656,8 @@ def register_admin_handlers(dp: Dispatcher):
 
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
-        offers_chat_id = os.getenv("WHISPER_OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("WHISPER_ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return
@@ -690,8 +676,8 @@ def register_admin_handlers(dp: Dispatcher):
     @dp.message(Command("getuser"))
     async def getuser_handler(message: types.Message):
         # Проверка чата
-        offers_chat_id = os.getenv("WHISPER_OFFERS_CHAT_ID")
-        admin_chat_id = os.getenv("WHISPER_ADMIN_CHAT_ID")
+        offers_chat_id = os.getenv("OFFERS_CHAT_ID")
+        admin_chat_id = os.getenv("ADMIN_CHAT_ID")
         allowed_ids = {str(offers_chat_id), str(admin_chat_id)}
         if str(message.chat.id) not in allowed_ids:
             return
@@ -780,5 +766,3 @@ def register_admin_handlers(dp: Dispatcher):
             msg += f"ID: {u.get('id')} | username: {u.get('username') or '-'}\n"
         # Если сообщение слишком длинное, разбиваем
         for i in range(0, len(msg), 3500):
-            await message.answer(msg[i:i+3500])
-

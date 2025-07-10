@@ -1070,101 +1070,76 @@ async def recalculate_queue_after_immediate_publication():
     headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
     
     # Получаем все неопубликованные и неотклоненные посты, отсортированные по posted_at
-    API_URL = API_BASE + 'posts/?is_posted=false&is_rejected=false&ordering=posted_at'
-    
+        # Получаем все посты (и опубликованные, и нет), отсортированные по posted_at
+    API_URL_ALL = API_BASE + 'posts/?is_rejected=false&ordering=posted_at&page_size=1000'
+    all_posts = []
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(API_URL, headers=headers) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if isinstance(data, dict) and 'results' in data:
-                        queued_posts = data['results']
-                    elif isinstance(data, list):
-                        queued_posts = data
-                    else:
-                        queued_posts = []
-                    
-                    if not queued_posts:
-                        logging.info("[recalculate_queue] No posts in queue to recalculate")
-                        return {'status': 'success', 'message': 'No posts in queue'}
-                    
-                    logging.info(f"[recalculate_queue] Found {len(queued_posts)} posts to recalculate")
-                    
-                    # Получаем время последнего опубликованного поста
-                    last_published_data = await get_last_published_post_time()
-                    if 'error' in last_published_data:
-                        logging.error(f"[recalculate_queue] Error getting last published post: {last_published_data['error']}")
-                        return {'error': 'Failed to get last published post'}
-                    
-                    last_published_time_str = last_published_data.get('channel_posted_at')
-                    if not last_published_time_str:
-                        logging.error("[recalculate_queue] No channel_posted_at in last published post")
-                        return {'error': 'No channel_posted_at in last published post'}
-                    
-                    # Парсим время последней публикации
-                    try:
-                        if '+' in last_published_time_str or 'Z' in last_published_time_str:
-                            last_published_dt = datetime.strptime(last_published_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                        else:
-                            last_published_dt = datetime.strptime(last_published_time_str, "%Y-%m-%d %H:%M:%S")
-                    except ValueError as e:
-                        logging.error(f"[recalculate_queue] Error parsing last published time: {e}")
-                        return {'error': f'Error parsing last published time: {e}'}
-                    
-                    # Пересчитываем время для каждого поста в очереди
-                    updated_count = 0
-                    current_time = last_published_dt
-                    
-                    for post in queued_posts:
-                        post_id = post.get('id')
-                        if not post_id:
-                            continue
-                        
-                        # Добавляем 30 минут к текущему времени
-                        current_time = current_time + timedelta(minutes=30)
-                        
-                        # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
-                        # Конвертируем в московское время для проверки
-                        moscow_tz = pytz.timezone('Europe/Moscow')
-                        current_time_moscow = current_time.astimezone(moscow_tz)
-                        current_hour = current_time_moscow.hour
-                        
-                        # Если время попадает в неактивный период (01:00-10:00), переносим на 10:00
-                        if 1 <= current_hour < 10:
-                            # Устанавливаем время на 10:00 того же дня
-                            new_time_moscow = current_time_moscow.replace(hour=10, minute=0, second=0, microsecond=0)
-                            # Конвертируем обратно в UTC
-                            current_time = new_time_moscow.astimezone(timezone.utc)
-                            logging.info(f"[recalculate_queue] Post {post_id} moved from {current_time_moscow.strftime('%H:%M')} to 10:00 due to inactive hours")
-                        
-                        # Форматируем время для API
-                        new_post_time = current_time.strftime("%Y-%m-%dT%H:%M:%S%z")
-                        
-                        # Обновляем время поста
-                        update_url = API_BASE + f'posts/{post_id}/'
-                        update_data = {'posted_at': new_post_time}
-                        
-                        try:
-                            async with session.patch(update_url, headers=headers, json=update_data) as update_response:
-                                if update_response.status == 200:
-                                    updated_count += 1
-                                    logging.info(f"[recalculate_queue] Updated post {post_id} to {new_post_time}")
-                                else:
-                                    logging.error(f"[recalculate_queue] Failed to update post {post_id}: {update_response.status}")
-                        except Exception as e:
-                            logging.error(f"[recalculate_queue] Exception updating post {post_id}: {e}")
-                    
-                    logging.info(f"[recalculate_queue] Successfully updated {updated_count} posts")
-                    return {
-                        'status': 'success', 
-                        'updated_count': updated_count,
-                        'message': f'Updated {updated_count} posts in queue'
-                    }
-                else:
-                    return {'error': f'API request failed with status {response.status}'}
+        async with aiohttp.ClientSession() as session_all:
+            async with session_all.get(API_URL_ALL, headers=headers) as resp_all:
+                if resp_all.status == 200:
+                    data_all = await resp_all.json()
+                    all_posts = data_all['results'] if isinstance(data_all, dict) and 'results' in data_all else data_all if isinstance(data_all, list) else []
     except Exception as e:
-        logging.error(f"[recalculate_queue] Exception: {e}")
-        return {'error': str(e)}
+        logging.error(f"[recalculate_queue] Error fetching all posts for chain: {e}")
+
+    # Найти последний опубликованный пост
+    last_published = None
+    for post in reversed(all_posts):
+        if post.get('is_posted') and post.get('channel_posted_at'):
+            last_published = post
+            break
+
+    def parse_dt(dtstr):
+        try:
+            if dtstr:
+                if '+' in dtstr or 'Z' in dtstr:
+                    return datetime.strptime(dtstr.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
+                else:
+                    return datetime.strptime(dtstr, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return None
+
+    queued_posts = [p for p in all_posts if not p.get('is_posted')]
+    if not queued_posts:
+        logging.info("[recalculate_queue] No posts in queue to recalculate")
+        return {'status': 'success', 'message': 'No posts in queue', 'updated_count': 0}
+
+    # Стартовое время — channel_posted_at последнего опубликованного, иначе posted_at первого в очереди
+    if last_published:
+        prev_time = parse_dt(last_published.get('channel_posted_at'))
+    else:
+        prev_time = parse_dt(queued_posts[0].get('posted_at')) or datetime.now(timezone.utc)
+
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    updated_count = 0
+
+    for post in queued_posts:
+        next_time = prev_time + timedelta(minutes=30)
+        # Проверяем неактивные часы
+        next_time_moscow = next_time.astimezone(moscow_tz)
+        if 1 <= next_time_moscow.hour < 10:
+            new_time_moscow = next_time_moscow.replace(hour=10, minute=0, second=0, microsecond=0)
+            next_time = new_time_moscow.astimezone(timezone.utc)
+            logging.info(f"[recalculate_queue] Post {post['id']} moved from {next_time_moscow.strftime('%H:%M')} to 10:00 due to inactive hours")
+        # Обновляем время поста
+        new_post_time = next_time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        update_url = API_BASE + f'posts/{str(post['id'])}/'
+        update_data = {'posted_at': new_post_time}
+        try:
+            async with aiohttp.ClientSession() as session_upd:
+                async with session_upd.patch(update_url, json=update_data, headers=headers) as resp_upd:
+                    if resp_upd.status == 200:
+                        updated_count += 1
+        except Exception as e:
+            logging.error(f"[recalculate_queue] Exception updating post {post['id']}: {e}")
+        prev_time = next_time
+
+    logging.info(f"[recalculate_queue] Successfully updated {updated_count} posts")
+    return {
+        'status': 'success',
+        'updated_count': updated_count,
+        'message': f'Updated {updated_count} posts in queue'
+    }
 
 async def get_queue_info():
     """
@@ -1444,3 +1419,88 @@ async def get_comments_for_user_posts(user_id: int) -> list:
     except Exception as e:
         logging.exception("Error in get_comments_for_user_posts")
         return []
+
+async def rebuild_post_queue(interval_minutes: int = 30):
+    """
+    Пересобирает очередь постов без дыр: первый пост в очереди получает время last_published_time + interval,
+    каждый следующий — +interval к предыдущему. Если время попадает в неактивный период (01:00-10:00 по Москве),
+    оно переносится на 10:00. Обновляет posted_at для каждого поста через PATCH.
+    """
+    headers = {'Accept': 'application/json', 'Content-Type': 'application/json'}
+    # Получаем все неопубликованные и неотклонённые посты, отсортированные по posted_at
+    API_URL = API_BASE + 'posts/?is_posted=false&is_rejected=false&ordering=posted_at'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(API_URL, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if isinstance(data, dict) and 'results' in data:
+                        queued_posts = data['results']
+                    elif isinstance(data, list):
+                        queued_posts = data
+                    else:
+                        queued_posts = []
+                    if not queued_posts:
+                        logging.info("[rebuild_post_queue] No posts in queue to rebuild")
+                        return {'status': 'success', 'message': 'No posts in queue'}
+                    # Получаем время последнего опубликованного поста
+                    last_published_data = await get_last_published_post_time()
+                    if 'error' in last_published_data:
+                        logging.error(f"[rebuild_post_queue] Error getting last published post: {last_published_data['error']}")
+                        return {'error': 'Failed to get last published post'}
+                    last_published_time_str = last_published_data.get('channel_posted_at')
+                    if not last_published_time_str:
+                        logging.error("[rebuild_post_queue] No channel_posted_at in last published post")
+                        return {'error': 'No channel_posted_at in last published post'}
+                    # Парсим время последней публикации
+                    try:
+                        if '+' in last_published_time_str or 'Z' in last_published_time_str:
+                            last_published_dt = datetime.strptime(last_published_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
+                        else:
+                            last_published_dt = datetime.strptime(last_published_time_str, "%Y-%m-%d %H:%M:%S")
+                    except ValueError as e:
+                        logging.error(f"[rebuild_post_queue] Error parsing last published time: {e}")
+                        return {'error': f'Error parsing last published time: {e}'}
+                    # Пересчитываем время для каждого поста в очереди
+                    updated_count = 0
+                    current_time = last_published_dt
+                    moscow_tz = pytz.timezone('Europe/Moscow')
+                    for post in queued_posts:
+                        post_id = post.get('id')
+                        if not post_id or (not isinstance(post_id, (str, int))):
+                            continue
+                        # Добавляем интервал к текущему времени
+                        current_time = current_time + timedelta(minutes=interval_minutes)
+                        # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
+                        current_time_moscow = current_time.astimezone(moscow_tz)
+                        current_hour = current_time_moscow.hour
+                        if 1 <= current_hour < 10:
+                            # Устанавливаем время на 10:00 того же дня
+                            new_time_moscow = current_time_moscow.replace(hour=10, minute=0, second=0, microsecond=0)
+                            current_time = new_time_moscow.astimezone(timezone.utc)
+                            logging.info(f"[rebuild_post_queue] Post {post_id} moved from {current_time_moscow.strftime('%H:%M')} to 10:00 due to inactive hours")
+                        # Форматируем время для API
+                        new_post_time = format_posted_at(current_time)
+                        # Обновляем время поста
+                        update_url = API_BASE + f'posts/{str(post_id)}/'
+                        update_data = {'posted_at': new_post_time}
+                        try:
+                            async with session.patch(update_url, headers=headers, json=update_data) as update_response:
+                                if update_response.status == 200:
+                                    updated_count += 1
+                                    logging.info(f"[rebuild_post_queue] Updated post {post_id} to {new_post_time}")
+                                else:
+                                    logging.error(f"[rebuild_post_queue] Failed to update post {post_id}: {update_response.status}")
+                        except Exception as e:
+                            logging.error(f"[rebuild_post_queue] Exception updating post {post_id}: {e}")
+                    logging.info(f"[rebuild_post_queue] Successfully updated {updated_count} posts")
+                    return {
+                        'status': 'success',
+                        'updated_count': updated_count,
+                        'message': f'Updated {updated_count} posts in queue'
+                    }
+                else:
+                    return {'error': f'API request failed with status {response.status}'}
+    except Exception as e:
+        logging.error(f"[rebuild_post_queue] Exception: {e}")
+        return {'error': str(e)}
