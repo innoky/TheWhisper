@@ -215,15 +215,6 @@ def register_suggest_handler(dp: Dispatcher):
         elif message.chat.type == 'private':
             content_type, post_content = get_content_type_and_text(message)
             user_id = message.from_user.id
-            # Создаём пост в базе сразу
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-            await try_create_post(
-                author_id=user_id,
-                content=post_content,
-                telegram_id=message.message_id,
-                post_time=now
-            )
             text = (
                 f"Проверьте, всё ли верно:\n\n"
                 f"<code>{post_content}</code>\n\n"
@@ -352,65 +343,83 @@ def register_suggest_handler(dp: Dispatcher):
         _, user_id, telegram_id = callback.data.split("_")
         user_id = int(user_id)
         telegram_id = int(telegram_id)
-        # Получаем пост из БД
-        post_info = await get_post_by_telegram_id(telegram_id)
-        if 'error' in post_info:
-            await callback.answer('Ошибка: пост не найден в базе данных')
+        # Получаем оригинальное сообщение пользователя через reply_to_message
+        msg_obj = callback.message
+        if not msg_obj or not hasattr(msg_obj, 'reply_to_message') or not isinstance(msg_obj.reply_to_message, Message):
+            logging.error('approve_callback: reply_to_message is not a valid Message')
+            await callback.answer('Ошибка: не найдено исходное сообщение пользователя')
             return
-        post_content = post_info.get('content', '')
-        content_type = post_info.get('media_type', 'text')
-        # Получаем автора
-        author_info = await get_user_info(user_id)
-        username = author_info.get('username', None)
-        firstname = author_info.get('firstname', None)
-        lastname = author_info.get('lastname', None)
-        # Гарантируем, что пользователь есть в базе
-        await try_create_user(
-            user_id=user_id,
-            username=username,
-            firstname=firstname,
-            lastname=lastname
-        )
-        moscow_tz = pytz.timezone('Europe/Moscow')
-        now = datetime.now(timezone(timedelta(hours=3)))
-
-        # Проверяем количество активных постов в очереди
-        active_posts_count = await get_active_posts_count()
-        logging.info(f"[approve_callback] Active posts in queue: {active_posts_count}")
-
-        # Если есть очередь, рассчитываем время относительно последнего поста в очереди
-        if active_posts_count > 0:
-            last_post_data = await get_last_post()
-            last_post_time_str = last_post_data.get('posted_at')
-            try:
-                if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
-                    last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                    last_post_dt = last_post_dt.astimezone(moscow_tz)
-                else:
-                    last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S")) if last_post_time_str else now
-            except ValueError as e:
-                last_post_dt = now
-            scheduled_time = last_post_dt + timedelta(minutes=POST_INTERVAL_MINUTES)
-        else:
-            last_published_data = await get_last_published_post_time()
-            if 'error' in last_published_data:
-                scheduled_time = now
-            else:
-                last_post_time_str = last_published_data.get('channel_posted_at')
+        original_msg = msg_obj.reply_to_message
+        if not original_msg or not hasattr(original_msg, 'from_user') or not original_msg.from_user:
+            await callback.answer("Ошибка: не удалось определить пользователя")
+            return
+        # Извлекаем данные из сообщения
+        content_type, post_content = get_content_type_and_text(original_msg)
+        # Проверяем, есть ли уже пост с таким telegram_id
+        post_info = await get_post_by_telegram_id(telegram_id)
+        if 'error' in post_info or not post_info.get('id'):
+            # Если нет — создаём пост
+            moscow_tz = pytz.timezone('Europe/Moscow')
+            now = datetime.now(timezone(timedelta(hours=3)))
+            # Получаем автора
+            author_info = await get_user_info(user_id)
+            username = author_info.get('username', None)
+            firstname = author_info.get('firstname', None)
+            lastname = author_info.get('lastname', None)
+            await try_create_user(
+                user_id=user_id,
+                username=username,
+                firstname=firstname,
+                lastname=lastname
+            )
+            # Время публикации рассчитываем как раньше
+            active_posts_count = await get_active_posts_count()
+            if active_posts_count > 0:
+                last_post_data = await get_last_post()
+                last_post_time_str = last_post_data.get('posted_at')
                 try:
                     if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
                         last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
                         last_post_dt = last_post_dt.astimezone(moscow_tz)
                     else:
-                        last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S"))
-                    time_since_last_post = (now - last_post_dt).total_seconds() / 60
-                    if time_since_last_post >= POST_INTERVAL_MINUTES:
-                        scheduled_time = now
-                    else:
-                        remaining_minutes = POST_INTERVAL_MINUTES - time_since_last_post
-                        scheduled_time = now + timedelta(minutes=remaining_minutes)
+                        last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S")) if last_post_time_str else now
                 except ValueError as e:
+                    last_post_dt = now
+                scheduled_time = last_post_dt + timedelta(minutes=POST_INTERVAL_MINUTES)
+            else:
+                last_published_data = await get_last_published_post_time()
+                if 'error' in last_published_data:
                     scheduled_time = now
+                else:
+                    last_post_time_str = last_published_data.get('channel_posted_at')
+                    try:
+                        if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
+                            last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
+                            last_post_dt = last_post_dt.astimezone(moscow_tz)
+                        else:
+                            last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S"))
+                        time_since_last_post = (now - last_post_dt).total_seconds() / 60
+                        if time_since_last_post >= POST_INTERVAL_MINUTES:
+                            scheduled_time = now
+                        else:
+                            remaining_minutes = POST_INTERVAL_MINUTES - time_since_last_post
+                            scheduled_time = now + timedelta(minutes=remaining_minutes)
+                    except ValueError as e:
+                        scheduled_time = now
+            scheduled_hour = scheduled_time.hour
+            if 1 <= scheduled_hour < 10:
+                scheduled_time = scheduled_time.replace(hour=10, minute=0, second=0, microsecond=0)
+                logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
+            # Создаём пост
+            create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
+            if 'error' in create_result:
+                await callback.answer("Ошибка создания поста!")
+                return
+            post_info = await get_post_by_telegram_id(telegram_id)
+            if 'error' in post_info or not post_info.get('id'):
+                await callback.answer("Ошибка: не удалось получить пост после создания!")
+                return
+        # ... остальная логика approve_callback без изменений, используя post_info ...
 
         # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
         scheduled_hour = scheduled_time.hour
