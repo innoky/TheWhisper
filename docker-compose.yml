@@ -43,16 +43,16 @@ services:
     networks:
       - app-network
 
-  askmephi_bot:
-    build:
-      context: ./askmephi_bot
-    restart: always
-    env_file:
-      - .env
-    depends_on:
-      - db
-    networks:
-      - app-network
+  # askmephi_bot:
+  #   build:
+  #     context: ./askmephi_bot
+  #   restart: always
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - db
+  #   networks:
+  #     - app-network
 
   pgadmin:
     image: dpage/pgadmin4
@@ -74,20 +74,20 @@ services:
     depends_on:
       - db
 
-  askmephi_search:
-    build:
-      context: ./askmephi_search
-    restart: always
-    env_file:
-      - .env
-    ports:
-      - "8001:8001"
-    networks:
-      - app-network
-    depends_on:
-      - backend
-    environment:
-      TZ: Europe/Moscow
+  # askmephi_search:
+  #   build:
+  #     context: ./askmephi_search
+  #   restart: always
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "8001:8001"
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     TZ: Europe/Moscow
       
 volumes:
   pgdata:

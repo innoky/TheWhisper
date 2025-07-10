@@ -242,7 +242,8 @@ def register_suggest_handler(dp: Dispatcher):
         if not original_msg or not hasattr(original_msg, 'from_user') or not original_msg.from_user:
             await callback.answer("Ошибка: не удалось определить пользователя")
             return
-        user_id = original_msg.from_user.id
+        user_id = int(callback.data.replace("confirm_suggest_", ""))
+
         content_type, post_content = get_content_type_and_text(original_msg)
         offers_chat_id = os.getenv('WHISPER_OFFERS_CHAT_ID')
         if offers_chat_id is None:
@@ -262,8 +263,8 @@ def register_suggest_handler(dp: Dispatcher):
         )
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}_{original_msg.message_id}"),
-                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}_{original_msg.message_id}")]
+                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}"),
+                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}")]
             ]
         )
         author_info = await get_user_info(user_id)
@@ -300,16 +301,18 @@ def register_suggest_handler(dp: Dispatcher):
     @dp.callback_query(F.data.startswith(("reject_",)))
     async def reject_callback(callback: types.CallbackQuery):
         # Парсим user_id и telegram_id из callback_data
-        _, user_id, telegram_id = callback.data.split("_")
-        user_id = int(user_id)
-        telegram_id = int(telegram_id)
+        user_id = int(callback.data.replace("reject_", ""))
+       
+        telegram_id = int(callback.message.reply_to_message.message_id)
         # Получаем пост из БД
-        post_info = await get_post_by_telegram_id(telegram_id)
-        if 'error' in post_info:
-            await callback.answer('Ошибка: пост не найден в базе данных')
-            return
-        content_type = post_info.get('media_type', 'text')
-        post_content = post_info.get('content', '')
+        try:
+            post_info = await get_post_by_telegram_id(telegram_id)
+
+            content_type = post_info.get('media_type', 'text')
+            post_content = post_info.get('content', '')
+        except:
+            post_content = callback.message.reply_to_message.text
+            content_type = "None" 
         # Получаем подробную инфу об авторе
         author_info = await get_user_info(user_id)
         author_username = author_info.get('username', 'N/A')
@@ -340,9 +343,9 @@ def register_suggest_handler(dp: Dispatcher):
     @dp.callback_query(F.data.startswith(("approve_",)))
     async def approve_callback(callback: types.CallbackQuery):
         # Парсим user_id и telegram_id из callback_data
-        _, user_id, telegram_id = callback.data.split("_")
+        _, user_id = callback.data.split("_")
         user_id = int(user_id)
-        telegram_id = int(telegram_id)
+        telegram_id = callback.message.reply_to_message.message_id
         # Получаем оригинальное сообщение пользователя через reply_to_message
         msg_obj = callback.message
         if not msg_obj or not hasattr(msg_obj, 'reply_to_message') or not isinstance(msg_obj.reply_to_message, Message):
@@ -356,70 +359,69 @@ def register_suggest_handler(dp: Dispatcher):
         # Извлекаем данные из сообщения
         content_type, post_content = get_content_type_and_text(original_msg)
         # Проверяем, есть ли уже пост с таким telegram_id
-        post_info = await get_post_by_telegram_id(telegram_id)
-        if 'error' in post_info or not post_info.get('id'):
+       
             # Если нет — создаём пост
-            moscow_tz = pytz.timezone('Europe/Moscow')
-            now = datetime.now(timezone(timedelta(hours=3)))
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        now = datetime.now(timezone(timedelta(hours=3)))
             # Получаем автора
-            author_info = await get_user_info(user_id)
-            username = author_info.get('username', None)
-            firstname = author_info.get('firstname', None)
-            lastname = author_info.get('lastname', None)
-            await try_create_user(
+        author_info = await get_user_info(user_id)
+        username = author_info.get('username', None)
+        firstname = author_info.get('firstname', None)
+        lastname = author_info.get('lastname', None)
+        await try_create_user(
                 user_id=user_id,
                 username=username,
                 firstname=firstname,
                 lastname=lastname
             )
             # Время публикации рассчитываем как раньше
-            active_posts_count = await get_active_posts_count()
-            if active_posts_count > 0:
-                last_post_data = await get_last_post()
-                last_post_time_str = last_post_data.get('posted_at')
+        active_posts_count = await get_active_posts_count()
+        if active_posts_count > 0:
+            last_post_data = await get_last_post()
+            last_post_time_str = last_post_data.get('posted_at')
+            try:
+                if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
+                    last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
+                    last_post_dt = last_post_dt.astimezone(moscow_tz)
+                else:
+                    last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S")) if last_post_time_str else now
+            except ValueError as e:
+                last_post_dt = now
+            scheduled_time = last_post_dt + timedelta(minutes=POST_INTERVAL_MINUTES)
+        else:
+            last_published_data = await get_last_published_post_time()
+            if 'error' in last_published_data:
+                scheduled_time = now
+            else:
+                last_post_time_str = last_published_data.get('channel_posted_at')
                 try:
                     if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
                         last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
                         last_post_dt = last_post_dt.astimezone(moscow_tz)
                     else:
-                        last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S")) if last_post_time_str else now
-                except ValueError as e:
-                    last_post_dt = now
-                scheduled_time = last_post_dt + timedelta(minutes=POST_INTERVAL_MINUTES)
-            else:
-                last_published_data = await get_last_published_post_time()
-                if 'error' in last_published_data:
-                    scheduled_time = now
-                else:
-                    last_post_time_str = last_published_data.get('channel_posted_at')
-                    try:
-                        if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
-                            last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
-                            last_post_dt = last_post_dt.astimezone(moscow_tz)
-                        else:
-                            last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S"))
-                        time_since_last_post = (now - last_post_dt).total_seconds() / 60
-                        if time_since_last_post >= POST_INTERVAL_MINUTES:
-                            scheduled_time = now
-                        else:
-                            remaining_minutes = POST_INTERVAL_MINUTES - time_since_last_post
-                            scheduled_time = now + timedelta(minutes=remaining_minutes)
-                    except ValueError as e:
+                        last_post_dt = moscow_tz.localize(datetime.strptime(last_post_time_str, "%Y-%m-%d %H:%M:%S"))
+                    time_since_last_post = (now - last_post_dt).total_seconds() / 60
+                    if time_since_last_post >= POST_INTERVAL_MINUTES:
                         scheduled_time = now
-            scheduled_hour = scheduled_time.hour
-            if 1 <= scheduled_hour < 10:
-                scheduled_time = scheduled_time.replace(hour=10, minute=0, second=0, microsecond=0)
-                logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
-            # Создаём пост
-            create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
-            if 'error' in create_result:
-                await callback.answer("Ошибка создания поста!")
-                return
-            post_info = await get_post_by_telegram_id(telegram_id)
-            if 'error' in post_info or not post_info.get('id'):
-                await callback.answer("Ошибка: не удалось получить пост после создания!")
-                return
-        # ... остальная логика approve_callback без изменений, используя post_info ...
+                    else:
+                        remaining_minutes = POST_INTERVAL_MINUTES - time_since_last_post
+                        scheduled_time = now + timedelta(minutes=remaining_minutes)
+                except ValueError as e:
+                    scheduled_time = now
+        scheduled_hour = scheduled_time.hour
+        if 1 <= scheduled_hour < 10:
+            scheduled_time = scheduled_time.replace(hour=10, minute=0, second=0, microsecond=0)
+            logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
+        # Создаём пост
+        create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
+        if 'error' in create_result:
+            await callback.answer("Ошибка создания поста!")
+            return
+        post_info = await get_post_by_telegram_id(telegram_id)
+        if 'error' in post_info or not post_info.get('id'):
+            await callback.answer("Ошибка: не удалось получить пост после создания!")
+            return
+    # ... остальная логика approve_callback без изменений, используя post_info ...
 
         # Проверяем, не попадает ли время в неактивный период (01:00-10:00)
         scheduled_hour = scheduled_time.hour
@@ -512,8 +514,8 @@ def register_suggest_handler(dp: Dispatcher):
             if post_info.get('id'):
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="Отклонить", callback_data=f"reject_{post_info['id']}")],
-                        [InlineKeyboardButton(text="Опубликовать сейчас", callback_data=f"publish_now_{post_info['id']}")]
+                        [InlineKeyboardButton(text="Отклонить", callback_data=f"reject_{user_id}")],
+                        [InlineKeyboardButton(text="Опубликовать сейчас", callback_data=f"publish_now_{user_id}_{post_info.get('id')}")]
                     ]
                 )
             else:
@@ -538,32 +540,22 @@ def register_suggest_handler(dp: Dispatcher):
         """Обработчик кнопки 'Опубликовать сейчас' - немедленно публикует пост и оплачивает его"""
         # Получаем post_id из callback_data
         try:
-            post_id = int(callback.data.split("_")[2])
+            user_id = int(callback.data.split("_")[2])
+            post_id = int(callback.data.split("_")[3])
         except Exception:
             await callback.answer('Ошибка: не удалось определить ID поста')
             return
         # Получаем информацию о посте по post_id
-        post_info = await get_post_info(post_id)
-        if 'error' in post_info:
-            logging.error(f"[publish_now_callback] Post not found: {post_info['error']}")
-            await callback.message.answer("❌ Ошибка: пост не найден в базе данных")
-            return
-        user_id = post_info.get('author')
-        telegram_id = post_info.get('telegram_id')
+       
+        telegram_id = callback.message.reply_to_message.message_id
         # Сразу отвечаем на callback, чтобы избежать timeout
+      
         await callback.answer("🚀 Публикуем пост...")
         try:
             logging.info(f"[publish_now_callback] Processing immediate publication for user_id={user_id}, telegram_id={telegram_id}")
             # Проверяем, что пост еще не опубликован
-            if post_info.get('is_posted', False):
-                await callback.message.answer("❌ Пост уже опубликован!")
-                return
-            # Проверяем, что пост еще не оплачен
-            if post_info.get('is_paid', False):
-                await callback.message.answer("❌ Пост уже оплачен!")
-                return
             # Немедленно публикуем пост и обрабатываем оплату
-            publish_result = await publish_post_now(post_info['id'])
+            publish_result = await publish_post_now(post_id)
             if 'error' in publish_result:
                 logging.error(f"[publish_now_callback] Publication failed: {publish_result['error']}")
                 await callback.message.answer(f"❌ Ошибка публикации: {publish_result['error']}")
@@ -573,14 +565,15 @@ def register_suggest_handler(dp: Dispatcher):
             tokens_added = publish_result.get('tokens_added', 0)
             author_level = publish_result.get('author_level', 1)
             # Публикуем в канал
-            success, channel_message_id = await publish_to_channel(post_info, callback.bot)
+            success, channel_message_id = await publish_to_channel(telegram_id, callback.bot)
             if not success:
                 await callback.message.answer("❌ Ошибка публикации в канал")
                 return
             # Обновляем информацию о канале
-            await update_post_channel_info(post_info['id'], channel_message_id)
+            await update_post_channel_info(post_id, channel_message_id)
             # Пересчитываем очередь после моментальной публикации
             queue_recalc_result = await recalculate_queue_after_immediate_publication()
+            post_info = await get_post_by_telegram_id(telegram_id)
             if 'error' in queue_recalc_result:
                 logging.warning(f"[publish_now_callback] Queue recalculation failed: {queue_recalc_result['error']}")
             else:
@@ -730,3 +723,82 @@ def register_suggest_handler(dp: Dispatcher):
         except Exception as e:
             logging.exception(f"[pay_callback] Exception processing payment for user_id={user_id}")
             await callback.answer("❌ Произошла ошибка при обработке оплаты")
+
+# --- Новый минималистичный обработчик предложки ---
+from aiogram import Router
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.enums import ParseMode
+from aiogram.filters import Command
+import os
+from db.wapi import try_create_post, mark_post_as_rejected_by_telegram_id, get_user_info, get_post_by_telegram_id
+from datetime import datetime, timedelta, timezone
+
+suggest_router = Router()
+
+ADMIN_CHAT_ID = os.getenv('WHISPER_OFFERS_CHAT_ID')
+
+# Пользователь отправляет пост в личку боту
+@suggest_router.message()
+async def handle_suggest_message(message: Message):
+    if message.chat.type != 'private' or not ADMIN_CHAT_ID:
+        return
+    user_id = message.from_user.id
+    # Пересылаем сообщение в админчат
+    fwd = await message.forward(ADMIN_CHAT_ID)
+    # Получаем инфу о пользователе
+    user_info = await get_user_info(user_id)
+    username = user_info.get('username', 'N/A')
+    level = user_info.get('level', 'N/A')
+    balance = user_info.get('balance', 'N/A')
+    # Формируем сообщение для админов
+    admin_text = (
+        f"<b>Пост в предложке</b>\n"
+        f"<b>Автор:</b> <code>{user_id}</code> @{username}\n"
+        f"<b>Уровень:</b> {level}\n"
+        f"<b>Баланс:</b> {balance} т.\n"
+        f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+    )
+    # Кнопки с user_id и message_id
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_simple_{user_id}_{fwd.message_id}"),
+                InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_simple_{user_id}_{fwd.message_id}")
+            ]
+        ]
+    )
+    await message.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=admin_text,
+        reply_markup=keyboard,
+        parse_mode=ParseMode.HTML,
+        reply_to_message_id=fwd.message_id
+    )
+    await message.reply("Пост отправлен на рассмотрение!", parse_mode=ParseMode.HTML)
+
+# Кнопка "Добавить в очередь"
+@suggest_router.callback_query(lambda c: c.data.startswith("approve_simple_"))
+async def handle_approve_simple(callback: CallbackQuery):
+    _, user_id, telegram_id = callback.data.split("_")[-3:]
+    user_id = int(user_id)
+    telegram_id = int(telegram_id)
+    # Получаем текст поста через get_post_by_telegram_id (или можно через callback.message.reply_to_message)
+    post_info = await get_post_by_telegram_id(telegram_id)
+    if post_info and not post_info.get('id'):
+        # Если поста нет — создаём
+        now = datetime.now(timezone(timedelta(hours=3)))
+        content = callback.message.reply_to_message.text if callback.message.reply_to_message else '[NO TEXT]'
+        await try_create_post(author_id=user_id, content=content, post_time=now, telegram_id=telegram_id)
+    await callback.answer("Пост добавлен в очередь!")
+    await callback.message.edit_text("✅ Пост добавлен в очередь", parse_mode=ParseMode.HTML)
+
+# Кнопка "Отклонить"
+@suggest_router.callback_query(lambda c: c.data.startswith("reject_simple_"))
+async def handle_reject_simple(callback: CallbackQuery):
+    _, user_id, telegram_id = callback.data.split("_")[-3:]
+    telegram_id = int(telegram_id)
+    await mark_post_as_rejected_by_telegram_id(telegram_id)
+    await callback.answer("Пост отклонён!")
+    await callback.message.edit_text("❌ Пост отклонён", parse_mode=ParseMode.HTML)
+
+# --- Конец нового обработчика ---

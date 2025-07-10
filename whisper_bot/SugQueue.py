@@ -99,18 +99,17 @@ async def send_publication_and_payment_notification(bot: Bot, post: dict, channe
         print(f"[send_publication_and_payment_notification] Error sending combined notification: {e}")
 
 
-async def publish_to_channel(post, bot) -> tuple[bool, int]:
+async def publish_to_channel(telegram_id, bot) -> tuple[bool, int]:
     """Публикует пост в Telegram-канал и возвращает ID сообщения в канале"""
     try:
         fci = os.getenv("WHISPER_OFFERS_CHAT_ID")
-        mi = post["telegram_id"]
+        mi = telegram_id
         ci = os.getenv("WHISPER_CHANNEL_ID")
-        print(f"Publishing post: from_chat_id={fci}, message_id={mi}, chat_id={ci}")
-        
+         
         # Копируем сообщение в канал и получаем ID нового сообщения
         channel_message = await bot.copy_message(
             from_chat_id=os.getenv("WHISPER_OFFERS_CHAT_ID"),
-            message_id=post["telegram_id"],
+            message_id=telegram_id,
             chat_id=os.getenv("WHISPER_CHANNEL_ID")
         )
         
