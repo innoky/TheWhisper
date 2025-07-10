@@ -215,6 +215,15 @@ def register_suggest_handler(dp: Dispatcher):
         elif message.chat.type == 'private':
             content_type, post_content = get_content_type_and_text(message)
             user_id = message.from_user.id
+            # Создаём пост в базе сразу
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            await try_create_post(
+                author_id=user_id,
+                content=post_content,
+                telegram_id=message.message_id,
+                post_time=now
+            )
             text = (
                 f"Проверьте, всё ли верно:\n\n"
                 f"<code>{post_content}</code>\n\n"
