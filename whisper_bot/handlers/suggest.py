@@ -419,20 +419,14 @@ def register_suggest_handler(dp: Dispatcher):
             scheduled_time = scheduled_time.replace(hour=10, minute=0, second=0, microsecond=0)
             logging.info(f"[approve_callback] Post scheduled time moved to 10:00 due to inactive hours (was {scheduled_hour}:{scheduled_time.minute})")
 
-        # Получаем тип контента и текст для БД
-        content_type, post_content = get_content_type_and_text(original_msg)
-        if not post_content:
-            await callback.answer("Ошибка: контент поста пустой!")
-            return
-
         # Создаём пост через API
-        create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=original_msg.message_id, post_time=scheduled_time)
+        create_result = await try_create_post(author_id=user_id, content=post_content, telegram_id=telegram_id, post_time=scheduled_time)
         if 'error' in create_result:
             await callback.answer("Ошибка создания поста!")
             return
 
         # Получаем post_info по telegram_id
-        post_info = await get_post_by_telegram_id(original_msg.message_id)
+        post_info = await get_post_by_telegram_id(telegram_id)
         if 'error' in post_info or not post_info.get('id'):
             await callback.answer("Ошибка: не удалось получить пост после создания!")
             return
