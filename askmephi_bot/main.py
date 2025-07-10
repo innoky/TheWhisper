@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from middlewares.logging import LoggingMiddleware
 from SugQueue import post_checker
+from middlewares.ensure_user import EnsureUserMiddleware
 
 # Импортируем хендлеры для регистрации
 from handlers.start import register_start_handlers
@@ -51,6 +52,9 @@ def main():
     bot = Bot(token=BOT_TOKEN)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    dp.update.middleware(EnsureUserMiddleware())
+    dp.message.middleware(EnsureUserMiddleware())
+    dp.callback_query.middleware(EnsureUserMiddleware())
     dp.update.middleware(LoggingMiddleware())
     
     # Импорт хендлеров уже регистрирует их через декораторы
