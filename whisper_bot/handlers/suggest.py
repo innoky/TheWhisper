@@ -215,10 +215,12 @@ def register_suggest_handler(dp: Dispatcher):
         elif message.chat.type == 'private':
             chance = random.randint(1,10)
             if chance > 5:
-                await message.answer(
-                    text = "<b>У нас открылся канал с вопросами!</b>\n\nТеперь вы можете задать свой вопрос в нашем втором канале - @askmephi - и получить на него ответ. \n\nПосты там публикуются чаще, поэтому если требуется задать срочный вопрос делайте это там!",
-                    parse_mode=ParseMode.HTML
-                )
+               await message.answer(
+                text="<b>У нас открылся канал с вопросами!</b>\n\n"
+         "Теперь вы можете задать свой вопрос в нашем новом канале — @askmephi — и получить ответ. \n\n"
+         "Посты там публикуются чаще, поэтому если вам нужно задать срочный вопрос, делайте это там!",
+                parse_mode=ParseMode.HTML
+)
             content_type, post_content = get_content_type_and_text(message)
             user_id = message.from_user.id
             text = (
