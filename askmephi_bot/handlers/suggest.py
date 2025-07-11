@@ -16,14 +16,14 @@ from aiogram.fsm.state import State, StatesGroup
 
 ACTIVE_START_HOUR = 10  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
-POST_INTERVAL_MINUTES = 30
+POST_INTERVAL_MINUTES = 15
 BOT_NAME = os.getenv("ORACLE_BOT_NAME")
 
 async def send_submission_notification(bot, user_id: int, post_content: str):
     """Отправляет уведомление пользователю о том, что пост отправлен на рассмотрение"""
     try:
         # Формируем сообщение
-        notification_text = f"<b>Пост отправлен на рассмотрение</b>\n\n"
+        notification_text = f"<b>Вопрос отправлен на рассмотрение</b>\n\n"
         notification_text += f"<b>Содержание:</b> «{post_content[:150]}{'...' if len(post_content) > 150 else ''}»\n\n"
         notification_text += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
         notification_text += f"<b>Процесс рассмотрения:</b>\n"
@@ -48,8 +48,7 @@ async def send_rejection_notification(bot, user_id: int, post_content: str):
     """Отправляет уведомление пользователю об отклонении поста"""
     try:
         # Формируем сообщение об отклонении
-        notification_text = f"<b>Ваш пост отклонен</b>\n\n"
-        notification_text += f"<b>Содержание:</b> «{post_content[:150]}{'...' if len(post_content) > 150 else ''}»\n\n"
+        notification_text = f"<b>Ваш вопрос отклонен</b>\n\n"
         notification_text += f"<b>Возможные причины:</b>\n"
         notification_text += f"<blockquote>• Пост не соответствует правилам сообщества\n"
         notification_text += f"• Содержание не подходит для канала\n"
@@ -79,7 +78,7 @@ async def send_approval_notification(bot, user_id: int, post_content: str, sched
     """Отправляет уведомление пользователю об одобрении поста"""
     try:
         # Формируем сообщение
-        notification_text = f"<b>Ваш пост одобрен</b>\n\n"
+        notification_text = f"<b>Ваш вопрос одобрен</b>\n\n"
         notification_text += f"<b>Содержание:</b> «{post_content[:150]}{'...' if len(post_content) > 150 else ''}»\n\n"
         
         scheduled_time_str = scheduled_time.strftime("%d.%m.%Y в %H:%M")
@@ -133,9 +132,9 @@ async def send_publication_and_payment_notification(bot, user_id: int, post_cont
         post_link = f"https://t.me/c/{channel_id}/{channel_message_id}"
         
         # Формируем объединенное сообщение
-        notification_text = f"<b>Пост опубликован и оплачен</b>\n\n"
+        notification_text = f"<b>Вопрос опубликован!</b>\n\n"
         notification_text += f"<b>Содержание:</b> «{post_content[:150]}{'...' if len(post_content) > 150 else ''}»\n\n"
-        notification_text += f"<b>Ссылка:</b> <a href=\"{post_link}\">Открыть пост в канале</a>\n\n"
+        notification_text += f"<b>Ссылка:</b> <a href=\"{post_link}\">Открыть вопрос в канале</a>\n\n"
         notification_text += f"<b>Награда:</b> +{tokens_added} т. (баланс: {new_balance} т.)\n\n"
         notification_text += f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
         notification_text += f"Используйте токены в /market для покупки псевдонимов"
@@ -202,34 +201,76 @@ def register_suggest_handler(dp: Dispatcher):
     async def suggest_handler(message: types.Message, state: FSMContext):
         if message.from_user and message.from_user.first_name == "Telegram":
             comment_url = f"https://t.me/{BOT_NAME}?start={message.message_id}"
+
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="💬 Комментировать", url=comment_url)]
+                    [InlineKeyboardButton(text="💬 Ответить", url=comment_url)]
                 ]
             )
             await message.reply(
-                "<b>Теперь вы можете оставить анонимный комментарий к этому посту:</b>",
+                "<b>Теперь вы можете оставить анонимный ответ к этому вопросу:</b>",
                 reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
         elif message.chat.type == 'private':
             content_type, post_content = get_content_type_and_text(message)
             user_id = message.from_user.id
-            text = (
-                f"Проверьте, всё ли верно:\n\n"
-                f"<code>{post_content}</code>\n\n"
-                f"Если всё правильно, нажмите 'Отправить'."
-            )
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
-                ]
-            )
-            sent = await message.reply(text, reply_markup=keyboard, parse_mode="HTML")
-            if sent and hasattr(sent, 'message_id'):
-                await state.update_data(confirm_msg_id=sent.message_id)
-            await state.set_state(SuggestStates.waiting_for_confirm)
-            return
+
+            found_similar = False
+            similar_link = None
+            similar_content = None
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "http://askmephi_search:8001/search/",
+                        params={"question": post_content},
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
+                        data = await resp.json()
+                if data.get("found"):
+                    found_similar = True
+                    similar_link = data["link"]
+                    similar_content = data.get("content")
+            except Exception as e:
+                logging.warning(f"[suggest_handler] tf-idf search error: {e}")
+            
+            if found_similar:
+                preview = ""
+                if isinstance(similar_content, str) and similar_content.strip():
+                    words = similar_content.split()
+                    preview = ' '.join(words[:15]) + ("..." if len(words) > 1 else "")
+                text = (
+                        "<b>Похожий анонимный вопрос уже был опубликован!</b>\n\n"
+                    + (f"<blockquote>{preview}</blockquote>\n" if preview else "")
+                    + f"<a href='{similar_link}'>Открыть в канале</a>\n\n"
+                    + "<b>Ваш вопрос:</b>\n"
+                    + f"<blockquote>{post_content}</blockquote>\n\n"
+                    + "Все равно отправить этот вопрос в предложку?"
+                    )
+                keyboard = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
+                        ]
+                    )
+                sent = await message.reply(text, reply_markup=keyboard, parse_mode="HTML")
+                return
+            else:
+                text = (
+                    f"Проверьте, всё ли верно:\n\n"
+                    f"<code>{post_content}</code>\n\n"
+                    f"Если всё правильно, нажмите 'Отправить'."
+                )
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
+                    ]
+                )
+                sent = await message.reply(text, reply_markup=keyboard, parse_mode="HTML")
+                if sent and hasattr(sent, 'message_id'):
+                    await state.update_data(confirm_msg_id=sent.message_id)
+                await state.set_state(SuggestStates.waiting_for_confirm)
+                return
 
     @dp.callback_query(F.data.startswith("confirm_suggest_"))
     async def confirm_suggest_callback(callback: types.CallbackQuery, state: FSMContext):
@@ -264,7 +305,9 @@ def register_suggest_handler(dp: Dispatcher):
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}"),
-                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}")]
+                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}"),
+                 InlineKeyboardButton(text="# Тегнуть", callback_data=f"tag_{user_id}")
+                 ]
             ]
         )
         author_info = await get_user_info(user_id)
@@ -275,7 +318,7 @@ def register_suggest_handler(dp: Dispatcher):
         author_balance = author_info.get('balance', 'N/A')
         admin_message = (
             f"#незапостчено\n"
-            f"<b>Новый пост в предложке</b>\n\n"
+            f"<b>Новый вопрос в предложке</b>\n\n"
             f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
             f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
             f"<b>Уровень:</b> {author_level}\n"
@@ -298,6 +341,36 @@ def register_suggest_handler(dp: Dispatcher):
         await callback.answer("Вопрос отправлен!")
         await state.clear()
 
+    @dp.callback_query(F.data.startswith(("tag_",)))
+    async def tag_callback(callback: types.CallbackQuery):
+        user_id = int(callback.data.replace("tag_", ""))
+       
+        ask_hashtags = os.getenv("ASK_HASHTAGS", "")
+        tags = [tag.strip() for tag in ask_hashtags.split(";") if tag.strip()]
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+              [InlineKeyboardButton(text=tag, callback_data=f"settag_{tag}_{user_id}")]
+            for tag in tags
+            ]
+        )       
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
+    @dp.callback_query(F.data.startswith(("settag_",)))
+    async def settag_callback(callback: types.CallbackQuery):
+        old_text = callback.message.reply_to_message.text
+        user_id = int(callback.data.split("_")[2])
+        tag =  (callback.data.split("_")[1])
+        await callback.message.reply_to_message.edit_text(text=f"<i>#{tag}</i>\n\n{old_text}", parse_mode=ParseMode.HTML)
+        
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{user_id}"),
+                 InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_{user_id}"),
+                 ]
+            ]
+        )
+        
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
     @dp.callback_query(F.data.startswith(("reject_",)))
     async def reject_callback(callback: types.CallbackQuery):
         # Парсим user_id и telegram_id из callback_data
@@ -324,7 +397,7 @@ def register_suggest_handler(dp: Dispatcher):
         result = await mark_post_as_rejected_by_telegram_id(telegram_id)
         logging.info(f"[reject_callback] Post removed from queue: {result}")
         # Формируем сообщение об отклонении для админ чата
-        admin_message_text = f"❌ <b>Пост отклонен!</b>\n\n"
+        admin_message_text = f"❌ <b>Вопрос отклонен!</b>\n\n"
         admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
         admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
         admin_message_text += f"<b>Уровень:</b> {author_level}\n"
@@ -337,12 +410,13 @@ def register_suggest_handler(dp: Dispatcher):
             text=admin_message_text,
             parse_mode="HTML"
         )
-        await callback.answer("Пост отклонён!")
+        await callback.answer("Вопрос отклонён!")
         await send_rejection_notification(callback.bot, user_id, post_content)
 
     @dp.callback_query(F.data.startswith(("approve_",)))
     async def approve_callback(callback: types.CallbackQuery):
         # Парсим user_id и telegram_id из callback_data
+        
         _, user_id = callback.data.split("_")
         user_id = int(user_id)
         telegram_id = callback.message.reply_to_message.message_id
@@ -483,7 +557,7 @@ def register_suggest_handler(dp: Dispatcher):
             author_level = author_info.get('level', 'N/A')
             author_balance = author_info.get('balance', 'N/A')
             # Сообщение для админов
-            admin_message_text = f"🚀 <b>Пост опубликован и оплачен</b>\n\n"
+            admin_message_text = f"🚀 <b>Вопрос опубликован!</b>\n\n"
             admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
             admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
             admin_message_text += f"<b>Уровень:</b> {author_level}\n"
@@ -520,7 +594,7 @@ def register_suggest_handler(dp: Dispatcher):
                 )
             else:
                 keyboard = None
-            admin_message_text = f"#незапостчено\n🕒 <b>Пост поставлен в очередь</b>\n\n"
+            admin_message_text = f"#незапостчено\n🕒 <b>Вопрос поставлен в очередь</b>\n\n"
             admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
             admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
             admin_message_text += f"<b>Уровень:</b> {author_level}\n"
@@ -591,7 +665,7 @@ def register_suggest_handler(dp: Dispatcher):
             author_level = author_info.get('level', 'N/A')
             author_balance = author_info.get('balance', 'N/A')
             # Сообщение для админов
-            admin_message_text = f"🚀 <b>Пост опубликован и оплачен</b>\n\n"
+            admin_message_text = f"🚀 <b>Вопрос опубликован и оплачен</b>\n\n"
             admin_message_text += f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
             admin_message_text += f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
             admin_message_text += f"<b>Уровень:</b> {author_level}\n"
@@ -687,7 +761,7 @@ def register_suggest_handler(dp: Dispatcher):
             author_level = author_info.get('level', 'N/A')
             author_balance = author_info.get('balance', 'N/A')
             # Формируем сообщение об оплате для админ чата
-            admin_message_text = f"<b>Пост оплачен</b>\n\n"
+            admin_message_text = f"<b>Вопрос оплачен</b>\n\n"
             admin_message_text += f"<b>Автор:</b> {author_id}\n"
             admin_message_text += f"<b>Содержание:</b> {post_info.get('content', '')[:100]}{'...' if len(post_info.get('content', '')) > 100 else ''}\n\n"
             admin_message_text += f"<b>Оплата:</b>\n"
@@ -728,6 +802,7 @@ def register_suggest_handler(dp: Dispatcher):
 from aiogram import Router
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.enums import ParseMode
+from aiogram.filters import Command
 import os
 from db.wapi import try_create_post, mark_post_as_rejected_by_telegram_id, get_user_info, get_post_by_telegram_id
 from datetime import datetime, timedelta, timezone
@@ -742,146 +817,62 @@ async def handle_suggest_message(message: Message):
     if message.chat.type != 'private' or not ADMIN_CHAT_ID:
         return
     user_id = message.from_user.id
-    content_type, post_content = get_content_type_and_text(message)
-    # tf-idf поиск похожих вопросов
-    found_similar = False
-    similar_link = None
-    similar_content = None
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "http://askmephi_search:8001/search/",
-                params={"question": post_content},
-                timeout=aiohttp.ClientTimeout(total=5)
-            ) as resp:
-                data = await resp.json()
-        if data.get("found"):
-            found_similar = True
-            similar_link = data["link"]
-            similar_content = data.get("content")
-    except Exception as e:
-        logging.warning(f"[suggest_handler] tf-idf search error: {e}")
-    # Если найден похожий вопрос — показываем предупреждение
-    if found_similar:
-        preview = ""
-        if isinstance(similar_content, str) and similar_content.strip():
-            words = similar_content.split()
-            preview = ' '.join(words[:15]) + ("..." if len(words) > 15 else "")
-        text = (
-            "<b>Похожий анонимный вопрос уже был опубликован!</b>\n\n"
-            + (f"<blockquote>{preview}</blockquote>\n" if preview else "")
-            + f"<a href='{similar_link}'>Открыть в канале</a>\n\n"
-            + "<b>Ваш вопрос:</b>\n"
-            + f"<blockquote>{post_content}</blockquote>\n\n"
-            + "Все равно отправить этот вопрос в предложку?"
-        )
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
+    # Пересылаем сообщение в админчат
+    fwd = await message.forward(ADMIN_CHAT_ID)
+    # Получаем инфу о пользователе
+    user_info = await get_user_info(user_id)
+    username = user_info.get('username', 'N/A')
+    level = user_info.get('level', 'N/A')
+    balance = user_info.get('balance', 'N/A')
+    # Формируем сообщение для админов
+    admin_text = (
+        f"<b>Пост в предложке</b>\n"
+        f"<b>Автор:</b> <code>{user_id}</code> @{username}\n"
+        f"<b>Уровень:</b> {level}\n"
+        f"<b>Баланс:</b> {balance} т.\n"
+        f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n"
+    )
+    # Кнопки с user_id и message_id
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_simple_{user_id}_{fwd.message_id}"),
+                InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_simple_{user_id}_{fwd.message_id}")
             ]
-        )
-        sent = await message.reply(text, reply_markup=keyboard, parse_mode="HTML")
-        return
-    # Если похожих нет — обычное подтверждение
-    text = (
-        f"Проверьте, всё ли верно:\n\n"
-        f"<blockquote>{post_content}</blockquote>\n\n"
-        f"Если всё правильно, нажмите 'Отправить'."
-    )
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Отправить", callback_data=f"confirm_suggest_{user_id}")]
         ]
     )
-    sent = await message.reply(text, reply_markup=keyboard, parse_mode="HTML")
-
-@suggest_router.callback_query(lambda c: c.data.startswith("confirm_suggest_"))
-async def confirm_suggest_callback(callback: CallbackQuery, state=None):
-    msg_obj = callback.message
-    if not msg_obj or not hasattr(msg_obj, 'reply_to_message') or not isinstance(msg_obj.reply_to_message, Message):
-        logging.error('confirm_suggest_callback: reply_to_message is not a valid Message')
-        await callback.answer("Ошибка: не найдено исходное сообщение пользователя")
-        return
-    original_msg = msg_obj.reply_to_message
-    if not original_msg or not hasattr(original_msg, 'from_user') or not original_msg.from_user:
-        await callback.answer("Ошибка: не удалось определить пользователя")
-        return
-    user_id = int(callback.data.replace("confirm_suggest_", ""))
-    content_type, post_content = get_content_type_and_text(original_msg)
-    offers_chat_id = os.getenv('ORACLE_OFFERS_CHAT_ID')
-    if offers_chat_id is None:
-        await callback.answer("Ошибка: не настроен offers_chat_id")
-        return
-    try:
-        await callback.bot.delete_message(callback.message.chat.id, msg_obj.message_id)
-    except Exception:
-        pass
-    if not hasattr(original_msg, 'message_id') or original_msg.message_id is None:
-        await callback.answer("Ошибка: не удалось получить message_id пользователя")
-        return
-    msg = await callback.bot.copy_message(
-        chat_id=offers_chat_id,
-        from_chat_id=callback.message.chat.id if hasattr(callback.message, 'chat') and callback.message.chat else offers_chat_id,
-        message_id=original_msg.message_id
-    )
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_simple_{user_id}_{original_msg.message_id}"),
-             InlineKeyboardButton(text="✅ Добавить", callback_data=f"approve_simple_{user_id}_{original_msg.message_id}")]
-        ]
-    )
-    author_info = await get_user_info(user_id)
-    author_username = author_info.get('username', 'N/A')
-    author_firstname = author_info.get('firstname', '')
-    author_lastname = author_info.get('lastname', '')
-    author_level = author_info.get('level', 'N/A')
-    author_balance = author_info.get('balance', 'N/A')
-    admin_message = (
-        f"#незапостчено\n"
-        f"<b>Новый анонимный вопрос в предложке</b>\n\n"
-        f"<b>Автор:</b> <code>{user_id}</code> @{author_username}\n"
-        f"<b>Имя:</b> {author_firstname} {author_lastname}\n"
-        f"<b>Уровень:</b> {author_level}\n"
-        f"<b>Баланс:</b> {author_balance} т.\n"
-        f"<b>Тип контента:</b> {content_type}\n"
-        f"<b>Время:</b> {datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m.%Y в %H:%M')}\n\n"
-        f"<b>Содержание:</b> {post_content[:300]}{'...' if post_content and len(post_content) > 300 else ''}"
-    )
-    if not hasattr(msg_obj, 'bot') or msg_obj.bot is None:
-        logging.error('message.bot is None')
-        return
-    await msg_obj.bot.send_message(
-        chat_id=offers_chat_id,
-        text=admin_message,
-        reply_to_message_id=msg.message_id if msg and hasattr(msg, 'message_id') else None,
+    await message.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=admin_text,
         reply_markup=keyboard,
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
+        reply_to_message_id=fwd.message_id
     )
-    await send_submission_notification(msg_obj.bot, user_id, post_content)
-    await callback.answer("Вопрос отправлен!")
-    if state:
-        await state.clear()
+    await message.reply("Пост отправлен на рассмотрение!", parse_mode=ParseMode.HTML)
 
-@suggest_router.callback_query(lambda c: c.data.startswith("reject_simple_"))
-async def handle_reject_simple(callback: CallbackQuery):
-    _, user_id, telegram_id = callback.data.split("_")[-3:]
-    telegram_id = int(telegram_id)
-    user_id = int(user_id)
-    await mark_post_as_rejected_by_telegram_id(telegram_id)
-    await callback.answer("Вопрос отклонён!")
-    await callback.message.edit_text("❌ Вопрос отклонён", parse_mode=ParseMode.HTML)
-
+# Кнопка "Добавить в очередь"
 @suggest_router.callback_query(lambda c: c.data.startswith("approve_simple_"))
 async def handle_approve_simple(callback: CallbackQuery):
     _, user_id, telegram_id = callback.data.split("_")[-3:]
     user_id = int(user_id)
     telegram_id = int(telegram_id)
+    # Получаем текст поста через get_post_by_telegram_id (или можно через callback.message.reply_to_message)
     post_info = await get_post_by_telegram_id(telegram_id)
     if post_info and not post_info.get('id'):
+        # Если поста нет — создаём
         now = datetime.now(timezone(timedelta(hours=3)))
         content = callback.message.reply_to_message.text if callback.message.reply_to_message else '[NO TEXT]'
         await try_create_post(author_id=user_id, content=content, post_time=now, telegram_id=telegram_id)
-    await callback.answer("Вопрос добавлен в очередь!")
-    await callback.message.edit_text("✅ Вопрос добавлен в очередь", parse_mode=ParseMode.HTML)
+    await callback.answer("Пост добавлен в очередь!")
+    await callback.message.edit_text("✅ Пост добавлен в очередь", parse_mode=ParseMode.HTML)
+
+# Кнопка "Отклонить"
+@suggest_router.callback_query(lambda c: c.data.startswith("reject_simple_"))
+async def handle_reject_simple(callback: CallbackQuery):
+    _, user_id, telegram_id = callback.data.split("_")[-3:]
+    telegram_id = int(telegram_id)
+    await mark_post_as_rejected_by_telegram_id(telegram_id)
+    await callback.answer("Пост отклонён!")
+    await callback.message.edit_text("❌ Пост отклонён", parse_mode=ParseMode.HTML)
+
 # --- Конец нового обработчика ---

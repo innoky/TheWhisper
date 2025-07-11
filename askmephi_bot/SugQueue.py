@@ -4,7 +4,7 @@ import time
 import os
 import datetime
 from datetime import timezone, timedelta
-from db.wapi import get_recent_posts, mark_post_as_posted, update_post_channel_info, get_user_info, process_post_payment, recalculate_queue_after_immediate_publication
+from db.wapi import get_recent_posts, mark_post_as_posted, update_post_channel_info, get_user_info, process_post_payment, recalculate_queue_after_immediate_publication, rebuild_post_queue
 
 
 async def send_publication_notification(bot: Bot, post: dict, channel_message_id: int):
@@ -99,28 +99,24 @@ async def send_publication_and_payment_notification(bot: Bot, post: dict, channe
         print(f"[send_publication_and_payment_notification] Error sending combined notification: {e}")
 
 
-async def publish_to_channel(post, bot) -> tuple[bool, int]:
+async def publish_to_channel(telegram_id, bot) -> tuple[bool, int]:
     """Публикует пост в Telegram-канал и возвращает ID сообщения в канале"""
     try:
         fci = os.getenv("ORACLE_OFFERS_CHAT_ID")
-        mi = post["telegram_id"]
-        print(mi, "POST TELEGRAM ID <<<<<< \n\n")
+        mi = telegram_id
         ci = os.getenv("ORACLE_CHANNEL_ID")
-        # Если есть только текст (или текст + хештег), публикуем через send_message
-        content = post.get('content', '').strip()
-        if content and not post.get('media_type'):
-            msg = await bot.send_message(
-                chat_id=ci,
-                text=content,
-                parse_mode="HTML"
-            )
-            return True, msg.message_id
-        # Иначе копируем оригинальное сообщение (медиа)
+         
+        # Копируем сообщение в канал и получаем ID нового сообщения
         channel_message = await bot.copy_message(
-            from_chat_id=fci,
-            message_id=mi,
-            chat_id=ci
+            from_chat_id=os.getenv("ORACLE_OFFERS_CHAT_ID"),
+            message_id=telegram_id,
+            chat_id=os.getenv("ORACLE_CHANNEL_ID")
         )
+        
+        print(f"Post published successfully! Channel message ID: {channel_message.message_id}")
+        print(f"Channel message object type: {type(channel_message)}")
+        print(f"Channel message ID: {channel_message.message_id}")
+        
         return True, channel_message.message_id
     except Exception as e:
         print(f"Ошибка публикации: {e}")
@@ -173,7 +169,7 @@ async def post_checker(bot):
             
             # Пересчитываем очередь каждые 10 циклов (200 секунд) - дополнительная проверка
             queue_recalc_counter += 1
-            if queue_recalc_counter >= 1:
+            if queue_recalc_counter >= 10:
                 print(f"[post_checker] Performing periodic queue rebuild...")
                 try:
                     recalc_result = await rebuild_post_queue()
@@ -235,7 +231,7 @@ async def post_checker(bot):
                 
                 if should_publish:
                     print(f"Publishing post {post['id']} to channel...")
-                    success, channel_message_id = await publish_to_channel(post, bot)
+                    success, channel_message_id = await publish_to_channel(post['telegram_id'], bot)
                     if success:
                         print(f"Updating post {post['id']} with channel_message_id={channel_message_id}")
                         # Сохраняем ID сообщения в канале
