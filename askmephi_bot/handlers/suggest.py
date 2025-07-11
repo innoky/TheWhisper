@@ -542,7 +542,7 @@ def register_suggest_handler(dp: Dispatcher):
             tokens_added = publish_result.get('tokens_added', 0)
             author_level = publish_result.get('author_level', 1)
             # Публикуем в канал
-            success, channel_message_id = await publish_to_channel(post_info, callback.bot)
+            success, channel_message_id = await publish_to_channel(telegram_id, callback.bot)
             if not success:
                 await callback.message.answer("❌ Ошибка публикации в канал")
                 return
