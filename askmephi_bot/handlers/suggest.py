@@ -652,7 +652,7 @@ def register_suggest_handler(dp: Dispatcher):
                 logging.warning(f"[publish_now_callback] Queue recalculation failed: {queue_recalc_result['error']}")
             else:
                 logging.info(f"[publish_now_callback] Queue recalculated: {queue_recalc_result.get('message', 'Success')}")
-            logging.info(f"[publish_now_callback] Successfully published and paid post {post_info['id']}: level {author_level}, {tokens_added} tokens")
+            logging.info(f"[publish_now_callback] Successfully published and paid post {post_id}: level {author_level}, {tokens_added} tokens")
             # Отправляем объединенное уведомление о публикации и оплате
             await send_publication_and_payment_notification(callback.bot, user_id, post_info.get('content', ''), tokens_added, publish_result.get('author_balance', 'N/A'), channel_message_id)
             # Убираем кнопки и показываем результат
