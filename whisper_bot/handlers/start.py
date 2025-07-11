@@ -33,6 +33,15 @@ def register_start_handlers(dp: Dispatcher):
             message.from_user.last_name
             )
     
+        chance = await random.randint(1,10)
+        print(chance)
+        if chance > 5:
+            await message.answer(
+            text="<b>У нас открылся канал с вопросами!</b>\n\n"
+         "Теперь вы можете задать свой вопрос в нашем новом канале — @askmephi — и получить ответ. \n\n"
+         "Посты там публикуются чаще, поэтому если вам нужно задать срочный вопрос, делайте это там!",
+        parse_mode=ParseMode.HTML
+        )
         # await get_or_create_user(
         #     user_id = message.from_user.id,
         #     username = message.from_user.username or "",
@@ -46,14 +55,7 @@ def register_start_handlers(dp: Dispatcher):
                 parse_mode=ParseMode.HTML)
             return
         elif (param.isdigit()):
-            chance = random.randint(1,10)
-            if chance > 5:
-                await message.answer(
-    text="<b>У нас открылся канал с вопросами!</b>\n\n"
-         "Теперь вы можете задать свой вопрос в нашем новом канале — @askmephi — и получить ответ. \n\n"
-         "Посты там публикуются чаще, поэтому если вам нужно задать срочный вопрос, делайте это там!",
-    parse_mode=ParseMode.HTML
-)
+           
             await state.set_state(CommentState.waiting_for_comment)
             await state.update_data(target_message_id=int(param))
             await message.answer(
