@@ -33,7 +33,7 @@ def register_start_handlers(dp: Dispatcher):
             message.from_user.last_name
             )
     
-        chance = await random.randint(1,10)
+        chance = random.randint(1,10)
         print(chance)
         if chance > 5:
             await message.answer(
