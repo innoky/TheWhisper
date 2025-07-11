@@ -453,7 +453,7 @@ def register_suggest_handler(dp: Dispatcher):
         active_posts_count = await get_active_posts_count()
         if active_posts_count > 0:
             last_post_data = await get_last_post()
-            last_post_time_str = last_post_data.get('posted_at')
+            last_post_time_str = last_post_data.get('channel_posted_at')
             try:
                 if last_post_time_str and ('+' in last_post_time_str or 'Z' in last_post_time_str):
                     last_post_dt = datetime.strptime(last_post_time_str.replace('Z', '+0000'), "%Y-%m-%dT%H:%M:%S%z")
@@ -535,7 +535,7 @@ def register_suggest_handler(dp: Dispatcher):
 
         if now_utc >= post_time_dt:
             # Время публикации пришло — публикуем и оплачиваем
-            publish_result = await publish_post_now(post_info['id'])
+            publish_result = await publish_post_now(telegram_id)
             if 'error' in publish_result:
                 await callback.message.answer(f"❌ Ошибка публикации: {publish_result['error']}")
                 return
