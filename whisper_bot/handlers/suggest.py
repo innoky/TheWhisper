@@ -12,7 +12,7 @@ from SugQueue import publish_to_channel, update_post_channel_info, send_publicat
 import logging
 import re
 from aiogram.fsm.state import State, StatesGroup
-
+import random
 
 ACTIVE_START_HOUR = 10  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
@@ -213,6 +213,12 @@ def register_suggest_handler(dp: Dispatcher):
                 parse_mode=ParseMode.HTML
             )
         elif message.chat.type == 'private':
+            chance = random.randint(1,10)
+            if chance > 5:
+                await message.answer(
+                    text = "<b>У нас открылся канал с вопросами!</b>\n\nТеперь вы можете задать свой вопрос в нашем втором канале - @askmephi - и получить на него ответ. \n\nПосты там публикуются чаще, поэтому если требуется задать срочный вопрос делайте это там!",
+                    parse_mode=ParseMode.HTML
+                )
             content_type, post_content = get_content_type_and_text(message)
             user_id = message.from_user.id
             text = (
