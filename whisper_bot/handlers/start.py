@@ -46,13 +46,6 @@ def register_start_handlers(dp: Dispatcher):
                 parse_mode=ParseMode.HTML)
             return
         elif (param.isdigit()):
-            await state.set_state(CommentState.waiting_for_comment)
-            await state.update_data(target_message_id=int(param))
-            await message.answer(
-                text=messages['request_comment']['text'].format(rules_url="https://telegra.ph/Pravila-anonimnyh-kommentariev-06-17"),
-                reply_markup=cancel_kb,
-                parse_mode=ParseMode.HTML,
-            ) 
             chance = random.randint(1,10)
             if chance > 5:
                 await message.answer(
@@ -61,6 +54,14 @@ def register_start_handlers(dp: Dispatcher):
          "Посты там публикуются чаще, поэтому если вам нужно задать срочный вопрос, делайте это там!",
     parse_mode=ParseMode.HTML
 )
+            await state.set_state(CommentState.waiting_for_comment)
+            await state.update_data(target_message_id=int(param))
+            await message.answer(
+                text=messages['request_comment']['text'].format(rules_url="https://telegra.ph/Pravila-anonimnyh-kommentariev-06-17"),
+                reply_markup=cancel_kb,
+                parse_mode=ParseMode.HTML,
+            ) 
+            
         else:
             await message.answer(
                 text = "<b>Добро пожаловать в TheWhisper</b>\n\n<blockquote>Отправляйте посты в этот чат для рассмотрения администрацией. Качественный контент будет опубликован в канале с начислением токенов.\n\nСистема токенов позволяет приобретать псевдонимы для анонимных комментариев.</blockquote>\n\n<b>Основные команды:</b>\n• /account — профиль и баланс\n• /market — магазин псевдонимов\n• /help — справка",
