@@ -11,7 +11,7 @@ from pathlib import Path
 from db.wapi import try_create_user
 from keyboards.reply import cancel_kb
 from handlers.comment import CommentState
-
+import random
 
 def register_start_handlers(dp: Dispatcher):
     @dp.message(CommandStart())
@@ -53,6 +53,11 @@ def register_start_handlers(dp: Dispatcher):
                 reply_markup=cancel_kb,
                 parse_mode=ParseMode.HTML,
             ) 
+            chance = random.randint(1,10)
+            if chance > 5:
+                await message.answer(
+                    text = "<b>У нас открылся канал с вопросами!</b>\n\nТеперь вы можете задать свой вопрос в нашем втором канале - @askmephi - и получить на него ответ. \n\nПосты там публикуются чаще, поэтому если требуется задать срочный вопрос делайте это там!"
+                )
         else:
             await message.answer(
                 text = "<b>Добро пожаловать в TheWhisper</b>\n\n<blockquote>Отправляйте посты в этот чат для рассмотрения администрацией. Качественный контент будет опубликован в канале с начислением токенов.\n\nСистема токенов позволяет приобретать псевдонимы для анонимных комментариев.</blockquote>\n\n<b>Основные команды:</b>\n• /account — профиль и баланс\n• /market — магазин псевдонимов\n• /help — справка",
