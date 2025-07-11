@@ -104,6 +104,7 @@ async def publish_to_channel(post, bot) -> tuple[bool, int]:
     try:
         fci = os.getenv("ORACLE_OFFERS_CHAT_ID")
         mi = post["telegram_id"]
+        print(mi, "POST TELEGRAM ID <<<<<< \n\n")
         ci = os.getenv("ORACLE_CHANNEL_ID")
         # Если есть только текст (или текст + хештег), публикуем через send_message
         content = post.get('content', '').strip()
