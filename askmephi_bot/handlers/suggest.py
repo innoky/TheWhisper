@@ -535,7 +535,7 @@ def register_suggest_handler(dp: Dispatcher):
 
         if now_utc >= post_time_dt:
             # Время публикации пришло — публикуем и оплачиваем
-            publish_result = await publish_post_now(telegram_id)
+            publish_result = await publish_post_now(post_info.get('id'))
             if 'error' in publish_result:
                 await callback.message.answer(f"❌ Ошибка публикации: {publish_result['error']}")
                 return
