@@ -223,7 +223,7 @@ async def post_checker(bot):
                                 created_at = created_at.astimezone(datetime.timezone.utc)
                             
                             time_since_creation = (now - created_at).total_seconds() / 60  # в минутах
-                            if time_since_creation >= 15:  # Пост создан более 30 минут назад
+                            if time_since_creation >= 30:  # Пост создан более 30 минут назад
                                 should_publish = True
                                 print(f"Post {post['id']} created {time_since_creation:.1f} minutes ago, publishing despite future schedule")
                         except Exception as e:
@@ -231,7 +231,6 @@ async def post_checker(bot):
                 
                 if should_publish:
                     print(f"Publishing post {post['id']} to channel...")
-                    print(post['telegram_id'])
                     success, channel_message_id = await publish_to_channel(post['telegram_id'], bot)
                     if success:
                         print(f"Updating post {post['id']} with channel_message_id={channel_message_id}")
