@@ -12,11 +12,10 @@ from SugQueue import publish_to_channel, update_post_channel_info, send_publicat
 import logging
 import re
 from aiogram.fsm.state import State, StatesGroup
-import random
 
 ACTIVE_START_HOUR = 10  # 10:00
 ACTIVE_END_HOUR = 1     # 01:00 следующего дня
-POST_INTERVAL_MINUTES = 15
+POST_INTERVAL_MINUTES = 30
 BOT_NAME = os.getenv("ORACLE_BOT_NAME")
 
 async def send_submission_notification(bot, user_id: int, post_content: str):
@@ -451,6 +450,7 @@ def register_suggest_handler(dp: Dispatcher):
             )
             # Время публикации рассчитываем как раньше
         active_posts_count = await get_active_posts_count()
+        
         if active_posts_count > 0:
             last_post_data = await get_last_post()
             last_post_time_str = last_post_data.get('channel_posted_at')

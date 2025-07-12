@@ -231,6 +231,7 @@ async def post_checker(bot):
                 
                 if should_publish:
                     print(f"Publishing post {post['id']} to channel...")
+                    print(post['telegram_id'])
                     success, channel_message_id = await publish_to_channel(post['telegram_id'], bot)
                     if success:
                         print(f"Updating post {post['id']} with channel_message_id={channel_message_id}")
