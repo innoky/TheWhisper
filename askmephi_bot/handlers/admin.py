@@ -666,11 +666,14 @@ def register_admin_handlers(dp: Dispatcher):
             await message.answer("<b>Ошибка получения очереди:</b> {}".format(queue_info['error']), parse_mode="HTML")
             return
         text = await format_queue_message(queue_info.get("results", []))
-        if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
-            await message.answer(str(text), parse_mode="HTML", disable_web_page_preview=True)
-        else:
-            await message.answer(**text.as_kwargs(), disable_web_page_preview=True)
-
+        try:
+            if isinstance(text, Text) and str(text) == "<b>Очередь пуста</b>":
+                await message.answer(str(text), parse_mode="HTML", disable_web_page_preview=True)
+            else:
+                await message.answer(**text.as_kwargs(), disable_web_page_preview=True)
+        except Exception as e:
+            print(e)
+            await message.answer(text="<b>Кажется очередь пуста</b>\n\nИли может произошла ошибка, но скорее всего очередь просто пуста!)", parse_mode="HTML", disable_web_page_preview=True)
     @dp.message(Command("queueupdate"))
     async def queueupdate_handler(message: types.Message):
         offers_chat_id = os.getenv("ORACLE_OFFERS_CHAT_ID")
